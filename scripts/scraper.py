@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
 import time
+from scripts.config import RAW_DATA_PATH
 
 
 class SerieAScoreScraper:
@@ -48,10 +49,12 @@ class SerieAScoreScraper:
             except Exception as e:
                 print(f"Error parsing row: {e}")
 
-    def save_to_csv(self, filename="data/raw/serie_a_scores.csv"):
+    def save_to_csv(self, filename="serie_a_scores.csv"):
+        RAW_DATA_PATH.mkdir(parents=True, exist_ok=True)
+        output_path = RAW_DATA_PATH / filename
         df = pd.DataFrame(self.matches)
-        df.to_csv(filename, index=False)
-        print(f"Saved {len(df)} completed matches to {filename}")
+        df.to_csv(output_path, index=False)
+        print(f"Saved {len(df)} completed matches to {output_path}")
 
     def run(self):
         self.setup_driver()
