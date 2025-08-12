@@ -1,10 +1,9 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 from typing import List
 import pandas as pd
-import time
+from webdriver_manager import (
+    WebDriverManager,
+)  # assuming you saved it in a separate module
 
 from config import URLS
 
@@ -32,8 +31,14 @@ class Match:
 
 
 class SerieAScraper:
-    def __init__(self, url: str, report_prefix: str = "https://fbref.com"):
+    def __init__(
+        self,
+        url: str,
+        driver_manager: WebDriverManager,
+        report_prefix: str = "https://fbref.com",
+    ):
         self.url = url
+        self.driver_manager = driver_manager
         self.report_prefix = report_prefix
         self.matches: List[Match] = []
 
@@ -108,16 +113,10 @@ class SerieAScraper:
             return None
 
     def scrape(self, limit: int = None) -> List[Match]:
-        options = Options()
-        options.add_argument("--headless")
-        service = Service()
-        driver = webdriver.Chrome(service=service, options=options)
-
         try:
-            driver.get(self.url)
-            time.sleep(3)
-
-            soup = BeautifulSoup(driver.page_source, "html.parser")
+            soup = BeautifulSoup(
+                self.driver_manager.get_page_source(self.url), "html.parser"
+            )
             rows = soup.select("table tbody tr")
             count = 0
 
@@ -130,10 +129,11 @@ class SerieAScraper:
                     if not match_info:
                         continue
 
-                    driver.get(match_info["report_link"])
-                    time.sleep(2)
+                    report_html = self.driver_manager.get_page_source(
+                        match_info["report_link"]
+                    )
+                    report_soup = BeautifulSoup(report_html, "html.parser")
 
-                    report_soup = BeautifulSoup(driver.page_source, "html.parser")
                     team_stats = self.extract_team_stats(report_soup)
                     team_stats_extra = self.extract_team_stats_extra(report_soup)
 
@@ -156,7 +156,7 @@ class SerieAScraper:
                     continue
 
         finally:
-            driver.quit()
+            self.driver_manager.quit()
 
         return self.matches
 
@@ -185,6 +185,8 @@ class SerieAScraper:
 
 
 if __name__ == "__main__":
-    scraper = SerieAScraper(URLS[2024])
+
+    driver_manager = WebDriverManager(headless=True)
+    scraper = SerieAScraper(URLS[2024], driver_manager)
     matches = scraper.scrape(limit=5)
     scraper.save_to_csv()
