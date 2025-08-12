@@ -33,14 +33,18 @@ class Match:
 class SerieAScraper:
     def __init__(
         self,
-        url: str,
+        year: int,
         driver_manager: WebDriverManager,
         report_prefix: str = "https://fbref.com",
     ):
-        self.url = url
+        self.year = year
+        self.url = self._build_url()
         self.driver_manager = driver_manager
         self.report_prefix = report_prefix
         self.matches: List[Match] = []
+
+    def _build_url(self) -> str:
+        return f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
 
     def extract_team_stats(self, soup: BeautifulSoup) -> dict:
         team_stats_div = soup.find("div", id="team_stats")
@@ -187,6 +191,6 @@ class SerieAScraper:
 if __name__ == "__main__":
 
     driver_manager = WebDriverManager(headless=True)
-    scraper = SerieAScraper(URLS[2024], driver_manager)
-    matches = scraper.scrape(limit=5)
+    scraper = SerieAScraper(year=2024, driver_manager=driver_manager)
+    matches = scraper.scrape(limit=3)
     scraper.save_to_csv()
