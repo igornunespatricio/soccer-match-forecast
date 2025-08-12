@@ -2,7 +2,9 @@ import csv
 import os
 import time
 from dataclasses import dataclass
+
 from typing import List
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -75,28 +77,13 @@ class SerieAScraper:
         return self.matches
 
     def save_to_csv(self, output_path: str):
+        if not self.matches:
+            print("⚠️ No matches to save.")
+            return
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, mode="w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(
-                [
-                    "Date",
-                    "Home Team",
-                    "Score",
-                    "Away Team",
-                    "Attendance",
-                    "Match Report Link",
-                ]
-            )
-            for match in self.matches:
-                writer.writerow(
-                    [
-                        match.date,
-                        match.home_team,
-                        match.score,
-                        match.away_team,
-                        match.attendance,
-                        match.report_link,
-                    ]
-                )
+
+        df = pd.DataFrame([match.__dict__ for match in self.matches])
+        df.to_csv(output_path, index=False, encoding="utf-8")
+
         print(f"✅ Saved {len(self.matches)} matches to {output_path}")
