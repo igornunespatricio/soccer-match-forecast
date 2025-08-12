@@ -37,13 +37,28 @@ class SerieAScraper:
         self.report_prefix = report_prefix
         self.matches: List[Match] = []
 
-    def extract_team_stats(self, soup: BeautifulSoup) -> str:
+    def extract_team_stats(self, soup: BeautifulSoup) -> dict:
         team_stats_div = soup.find("div", id="team_stats")
-        return (
-            team_stats_div.get_text(separator=" | ", strip=True)
-            if team_stats_div
-            else "N/A"
-        )
+        if not team_stats_div:
+            return {}
+
+        stats = {}
+        rows = team_stats_div.find_all("tr")
+
+        current_label = None
+        for row in rows:
+            th = row.find("th")
+            if th and th.has_attr("colspan") and th["colspan"] == "2":
+                current_label = th.get_text(strip=True)
+            else:
+                tds = row.find_all("td")
+                if len(tds) == 2 and current_label:
+                    home_value = tds[0].get_text(strip=True)
+                    away_value = tds[1].get_text(strip=True)
+                    stats[current_label] = {"home": home_value, "away": away_value}
+                    current_label = None  # Reset after using
+
+        return stats
 
     def extract_team_stats_extra(self, soup: BeautifulSoup) -> str:
         extra_stats_div = soup.find("div", id="team_stats_extra")
