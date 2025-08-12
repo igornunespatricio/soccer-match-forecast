@@ -1,0 +1,7 @@
+- add a method in scraper to build url based on year: format is "https://fbref.com/en/comps/24/{year}/schedule/{year}-Serie-A-Scores-and-Fixtures"
+- add more urls/seasons to scrap
+- create main.py script as central script to run pipeline
+- add argument parser in main.py for cli, argument to pass years to scrap
+- add print statements for debugging
+- add logger script
+- change base dir in config.py to be dynamic
