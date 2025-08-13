@@ -1,196 +1,183 @@
-from bs4 import BeautifulSoup
-from typing import List
+import time
+import random
+from typing import List, Dict, Optional
+from dataclasses import dataclass
 import pandas as pd
-from webdriver_manager import (
-    WebDriverManager,
-)  # assuming you saved it in a separate module
+from bs4 import BeautifulSoup
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from webdriver import ChromeDriverWrapper
+from logger import get_logger
 
-from config import URLS
+logger = get_logger("SerieAScraper")
 
 
+@dataclass
 class Match:
-    def __init__(
-        self,
-        date,
-        home,
-        score,
-        away,
-        attendance,
-        report_link,
-        team_stats,
-        team_stats_extra,
-    ):
-        self.date = date
-        self.home = home
-        self.score = score
-        self.away = away
-        self.attendance = attendance
-        self.report_link = report_link
-        self.team_stats = team_stats
-        self.team_stats_extra = team_stats_extra
+    date: str
+    home: str
+    score: str
+    away: str
+    attendance: str
+    report_link: str
+    team_stats: Dict
+    team_stats_extra: str
 
 
 class SerieAScraper:
-    def __init__(
-        self,
-        year: int,
-        driver_manager: WebDriverManager,
-        report_prefix: str = "https://fbref.com",
-    ):
+    def __init__(self, driver, year: int):
+        self.driver = driver
         self.year = year
-        self.url = self._build_url()
-        self.driver_manager = driver_manager
-        self.report_prefix = report_prefix
-        self.matches: List[Match] = []
+        self.matches = []
+        self.request_times = []
 
-    def _build_url(self) -> str:
-        return f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
+    def _wait_if_needed(self):
+        """Enforce 18 requests per minute limit"""
+        now = time.time()
+        self.request_times = [t for t in self.request_times if now - t < 60]
 
-    def extract_team_stats(self, soup: BeautifulSoup) -> dict:
-        team_stats_div = soup.find("div", id="team_stats")
-        if not team_stats_div:
-            return {}
+        if len(self.request_times) >= 18:
+            wait = 60 - (now - self.request_times[0]) + 1
+            logger.info(f"Waiting {wait:.1f}s to comply with rate limits")
+            time.sleep(wait)
+            self.request_times = []
 
-        stats = {}
-        rows = team_stats_div.find_all("tr")
+        time.sleep(random.uniform(2, 4))  # Random delay
+        self.request_times.append(time.time())
 
-        current_label = None
-        for row in rows:
-            th = row.find("th")
-            if th and th.has_attr("colspan") and th["colspan"] == "2":
-                current_label = th.get_text(strip=True)
-            else:
-                tds = row.find_all("td")
-                if len(tds) == 2 and current_label:
-                    home_value = tds[0].get_text(strip=True)
-                    away_value = tds[1].get_text(strip=True)
-                    stats[current_label] = {"home": home_value, "away": away_value}
-                    current_label = None  # Reset after using
+    def _get_page(self, url: str) -> BeautifulSoup:
+        """Load page with rate limiting"""
+        self._wait_if_needed()
+        self.driver.get(url)
+        WebDriverWait(self.driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "table.stats_table"))
+        )
+        return BeautifulSoup(self.driver.page_source, "html.parser")
 
-        return stats
-
-    def extract_team_stats_extra(self, soup: BeautifulSoup) -> str:
-        extra_stats_div = soup.find("div", id="team_stats_extra")
-        if not extra_stats_div:
-            return "N/A"
-
-        # Find all <div> blocks that do NOT have class="th"
-        stat_blocks = extra_stats_div.find_all("div", recursive=False)
-        extracted = []
-
-        for block in stat_blocks:
-            items = block.find_all("div")
-            for item in items:
-                if "th" not in item.get("class", []):
-                    text = item.get_text(strip=True)
-                    if text:
-                        extracted.append(text)
-
-        return " | ".join(extracted)
-
-    def extract_basic_match_info(self, row) -> dict | None:
-        score_cell = row.select_one("td[data-stat='score']")
-        if not score_cell or not score_cell.text.strip():
-            return None  # Skip if score is missing or empty
-
-        try:
-            score = score_cell.text.strip()
-            date = row.select_one("td[data-stat='date']").text.strip()
-            home = row.select_one("td[data-stat='home_team']").text.strip()
-            away = row.select_one("td[data-stat='away_team']").text.strip()
-            attendance = row.select_one("td[data-stat='attendance']").text.strip()
-            report_el = row.select_one("td[data-stat='match_report'] a")
-            report_link = (
-                f"{self.report_prefix}{report_el['href']}" if report_el else "N/A"
-            )
-
-            return {
-                "date": date,
-                "home": home,
-                "score": score,
-                "away": away,
-                "attendance": attendance,
-                "report_link": report_link,
-            }
-        except Exception as e:
-            print(f"Error extracting basic match info: {e}")
+    def _extract_match_data(self, row) -> Optional[Dict]:
+        """Extract basic match info from schedule row"""
+        if (
+            not (score := row.select_one("td[data-stat='score']"))
+            or not score.text.strip()
+        ):
             return None
 
-    def scrape(self, limit: int = None) -> List[Match]:
-        try:
-            soup = BeautifulSoup(
-                self.driver_manager.get_page_source(self.url), "html.parser"
+        report_link = row.select_one('td[data-stat="match_report"] a')
+        return {
+            "date": row.select_one("td[data-stat='date']").text.strip(),
+            "home": row.select_one("td[data-stat='home_team']").text.strip(),
+            "score": score.text.strip(),
+            "away": row.select_one("td[data-stat='away_team']").text.strip(),
+            "attendance": row.select_one("td[data-stat='attendance']").text.strip(),
+            "report_link": (
+                f"https://fbref.com{report_link['href']}" if report_link else None
+            ),
+        }
+
+    def _extract_stats(self, soup: BeautifulSoup) -> tuple:
+        """Extract team stats from match report"""
+        stats = {}
+        current_label = None
+
+        if stats_div := soup.find("div", id="team_stats"):
+            for row in stats_div.find_all("tr"):
+                if (th := row.find("th")) and th.get("colspan") == "2":
+                    current_label = th.get_text(strip=True)
+                elif current_label and (tds := row.find_all("td")) and len(tds) == 2:
+                    stats[current_label] = {
+                        "home": tds[0].get_text(strip=True),
+                        "away": tds[1].get_text(strip=True),
+                    }
+
+        extra_stats = (
+            " | ".join(
+                item.get_text(strip=True)
+                for block in soup.find("div", id="team_stats_extra").find_all(
+                    "div", recursive=False
+                )
+                for item in block.find_all("div")
+                if "th" not in item.get("class", [])
             )
-            rows = soup.select("table tbody tr")
-            count = 0
+            if soup.find("div", id="team_stats_extra")
+            else "N/A"
+        )
 
-            for row in rows:
-                if limit is not None and count >= limit:
-                    break
+        return stats, extra_stats
 
-                try:
-                    match_info = self.extract_basic_match_info(row)
-                    if not match_info:
-                        continue
+    def scrape_season(self, max_matches=None) -> List[Match]:
+        """Scrape all matches with automatic rate limiting"""
+        base_url = f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
+        soup = self._get_page(base_url)
 
-                    report_html = self.driver_manager.get_page_source(
-                        match_info["report_link"]
+        for i, row in enumerate(soup.select("table.stats_table tbody tr")):
+            if max_matches and i >= max_matches:
+                break
+
+            if not (match := self._extract_match_data(row)) or not match["report_link"]:
+                continue
+
+            try:
+                report_soup = self._get_page(match["report_link"])
+                team_stats, extra_stats = self._extract_stats(report_soup)
+
+                self.matches.append(
+                    Match(
+                        match["date"],
+                        match["home"],
+                        match["score"],
+                        match["away"],
+                        match["attendance"],
+                        match["report_link"],
+                        team_stats,
+                        extra_stats,
                     )
-                    report_soup = BeautifulSoup(report_html, "html.parser")
+                )
+                logger.info(
+                    f"Scraped {i+1}: {match['home']} vs {match['away']} - Report: {match['report_link']}"
+                )
 
-                    team_stats = self.extract_team_stats(report_soup)
-                    team_stats_extra = self.extract_team_stats_extra(report_soup)
-
-                    self.matches.append(
-                        Match(
-                            match_info["date"],
-                            match_info["home"],
-                            match_info["score"],
-                            match_info["away"],
-                            match_info["attendance"],
-                            match_info["report_link"],
-                            team_stats,
-                            team_stats_extra,
-                        )
-                    )
-
-                    count += 1
-                except Exception as e:
-                    print(f"Error parsing row: {e}")
-                    continue
-
-        finally:
-            self.driver_manager.quit()
+            except Exception as e:
+                logger.error(f"Error on match {i+1}: {e}")
+                continue
 
         return self.matches
 
-    def save_to_csv(self, filename: str = "serie_a_matches.csv"):
+    def save_to_csv(self, filename):
+        """Save scraped matches to CSV"""
         if not self.matches:
-            print("No matches to save.")
+            logger.warning("No matches to save")
             return
 
-        data = [
-            {
-                "Date": match.date,
-                "Home": match.home,
-                "Score": match.score,
-                "Away": match.away,
-                "Attendance": match.attendance,
-                "Match Report": match.report_link,
-                "Team Stats": match.team_stats,
-                "Team Stats Extra": match.team_stats_extra,
-            }
-            for match in self.matches
-        ]
-
-        df = pd.DataFrame(data)
-        df.to_csv(filename, index=False)
-        print(f"Saved {len(df)} matches to {filename}")
+        pd.DataFrame(
+            [
+                {
+                    "Date": m.date,
+                    "Home": m.home,
+                    "Score": m.score,
+                    "Away": m.away,
+                    "Attendance": m.attendance,
+                    "Report Link": m.report_link,
+                    "Team Stats": m.team_stats,
+                    "Extra Stats": m.team_stats_extra,
+                }
+                for m in self.matches
+            ]
+        ).to_csv(filename, index=False)
+        logger.info(f"Saved {len(self.matches)} matches to {filename}")
 
 
 if __name__ == "__main__":
+    driver_manager = ChromeDriverWrapper(headless=True)
+    driver = driver_manager.get_driver()
 
-    driver_manager = WebDriverManager(headless=True)
-    scraper = SerieAScraper(year=2024, driver_manager=driver_manager)
-    matches = scraper.scrape(limit=3)
-    scraper.save_to_csv()
+    try:
+        scraper = SerieAScraper(driver, 2024)
+        scraper.scrape_season(max_matches=30)
+        scraper.save_to_csv("serie_a_results.csv")
+    except Exception as e:
+        logger.error(f"Scraping failed: {e}")
+    finally:
+        driver_manager.close()
+
+# TODO: modify waiting logic to be simpler: wait an amount of time between each match request. amount of time should be configurable by parameter in config.py
