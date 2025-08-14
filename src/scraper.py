@@ -1,5 +1,5 @@
-import time
 import random
+import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import pandas as pd
@@ -9,6 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver import ChromeDriverWrapper
 from logger import get_logger
+from config import REQUEST_DELAY, MAX_RETRIES
 
 logger = get_logger("SerieAScraper")
 
@@ -30,29 +31,15 @@ class SerieAScraper:
         self.driver = driver
         self.year = year
         self.matches = []
-        self.request_times = []
-
-    def _wait_if_needed(self):
-        """Enforce 18 requests per minute limit"""
-        now = time.time()
-        self.request_times = [t for t in self.request_times if now - t < 60]
-
-        if len(self.request_times) >= 18:
-            wait = 60 - (now - self.request_times[0]) + 1
-            logger.info(f"Waiting {wait:.1f}s to comply with rate limits")
-            time.sleep(wait)
-            self.request_times = []
-
-        time.sleep(random.uniform(2, 4))  # Random delay
-        self.request_times.append(time.time())
 
     def _get_page(self, url: str) -> BeautifulSoup:
-        """Load page with rate limiting"""
-        self._wait_if_needed()
+        """Load page with configured delay"""
         self.driver.get(url)
         WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "table.stats_table"))
         )
+        logger.debug(f"Waiting {REQUEST_DELAY:.1f}s after request")
+        time.sleep(REQUEST_DELAY)
         return BeautifulSoup(self.driver.page_source, "html.parser")
 
     def _extract_match_data(self, row) -> Optional[Dict]:
@@ -117,29 +104,37 @@ class SerieAScraper:
             if not (match := self._extract_match_data(row)) or not match["report_link"]:
                 continue
 
-            try:
-                report_soup = self._get_page(match["report_link"])
-                team_stats, extra_stats = self._extract_stats(report_soup)
+            for attempt in range(MAX_RETRIES):
+                try:
+                    report_soup = self._get_page(match["report_link"])
+                    team_stats, extra_stats = self._extract_stats(report_soup)
 
-                self.matches.append(
-                    Match(
-                        match["date"],
-                        match["home"],
-                        match["score"],
-                        match["away"],
-                        match["attendance"],
-                        match["report_link"],
-                        team_stats,
-                        extra_stats,
+                    self.matches.append(
+                        Match(
+                            match["date"],
+                            match["home"],
+                            match["score"],
+                            match["away"],
+                            match["attendance"],
+                            match["report_link"],
+                            team_stats,
+                            extra_stats,
+                        )
                     )
-                )
-                logger.info(
-                    f"Scraped {i+1}: {match['home']} vs {match['away']} - Report: {match['report_link']}"
-                )
-
-            except Exception as e:
-                logger.error(f"Error on match {i+1}: {e}")
-                continue
+                    logger.info(
+                        f"Scraped {i+1}: {match['home']} vs {match['away']} - Report: {match['report_link']}"
+                    )
+                    break  # Success - exit retry loop
+                except Exception as e:
+                    if attempt == MAX_RETRIES - 1:
+                        logger.error(
+                            f"Failed after {MAX_RETRIES} attempts for match {i+1}: {e}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed for match {i+1}, retrying..."
+                        )
+                        time.sleep(REQUEST_DELAY * (attempt + 1))  # Exponential backoff
 
         return self.matches
 
@@ -173,11 +168,9 @@ if __name__ == "__main__":
 
     try:
         scraper = SerieAScraper(driver, 2024)
-        scraper.scrape_season(max_matches=30)
+        scraper.scrape_season()
         scraper.save_to_csv("serie_a_results.csv")
     except Exception as e:
         logger.error(f"Scraping failed: {e}")
     finally:
         driver_manager.close()
-
-# TODO: modify waiting logic to be simpler: wait an amount of time between each match request. amount of time should be configurable by parameter in config.py
