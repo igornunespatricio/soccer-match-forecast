@@ -4,6 +4,7 @@ from pathlib import Path
 from config import SCRAPER_LOGGER_PATH  # Import from config
 
 
+# TODO: keep log for last 7 days
 def get_logger(
     name: str = "scraper", log_file_path: Path = SCRAPER_LOGGER_PATH
 ) -> logging.Logger:
