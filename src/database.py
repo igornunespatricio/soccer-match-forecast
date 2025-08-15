@@ -113,7 +113,8 @@ class DatabaseManager:
                         checksum = excluded.checksum,
                         last_updated = CURRENT_TIMESTAMP,
                         is_current = TRUE
-                        WHERE {RAW_TABLE}.team_stats = '' OR {RAW_TABLE}.team_stats IS NULL
+                        WHERE {RAW_TABLE}.team_stats = '' OR {RAW_TABLE}.team_stats IS NULL 
+                        OR {RAW_TABLE}.extra_stats = '' OR {RAW_TABLE}.extra_stats = 'N/A'
                     """,
                     (
                         data["date"],
@@ -206,10 +207,66 @@ class DatabaseManager:
             f"Total records: {len(df)}"
         )
 
-    def get_all_matches(self) -> list[dict]:
+    def get_matches(
+        self,
+        year: str = None,
+        has_report_link: bool = True,
+        has_team_stats: bool = False,
+        has_extra_stats: bool = False,
+        limit: int = None,
+    ) -> list[dict]:
+        """
+        Get matches with optional filters
+        Args:
+            year: Filter by year (extracted from date field)
+            has_team_stats: True=has stats, False=no stats, None=don't care
+            has_report_link: True=has link, False=no link, None=don't care
+            has_extra_stats: True=has extra stats, False=no extra stats, None=don't care
+            limit: Maximum number of matches to return
+        """
+        query = f"SELECT * FROM {RAW_TABLE}"
+        conditions = []
+        params = []
+
+        if year:
+            conditions.append("date LIKE ?")
+            params.append(f"{year}%")
+
+        if has_team_stats is not None:
+            if has_team_stats:
+                conditions.append(
+                    "(team_stats IS NOT NULL AND team_stats != '' AND team_stats != 'null')"
+                )
+            else:
+                conditions.append(
+                    "(team_stats IS NULL OR team_stats = '' OR team_stats = 'null')"
+                )
+
+        if has_report_link is not None:
+            if has_report_link:
+                conditions.append("(report_link IS NOT NULL AND report_link != '')")
+            else:
+                conditions.append("(report_link IS NULL OR report_link = '')")
+
+        if has_extra_stats is not None:
+            if has_extra_stats:
+                conditions.append(
+                    "(extra_stats IS NOT NULL AND extra_stats != '' AND extra_stats != 'N/A')"
+                )
+            else:
+                conditions.append(
+                    "(extra_stats IS NULL OR extra_stats = '' OR extra_stats = 'N/A')"
+                )
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        if limit:
+            query += f" LIMIT {limit}"
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {RAW_TABLE}")
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
 
@@ -217,5 +274,8 @@ if __name__ == "__main__":
     db = DatabaseManager()
     db.initialize_db()
 
-    csv_path = RAW_DATA_PATH / "serie_a_2024_results.csv"
-    db.migrate_csv(csv_path)
+    # testing get matches
+    matches = db.get_matches(
+        year="2023", has_team_stats=True, has_report_link=True, has_extra_stats=False
+    )
+    print("Number of matches scraped: ", len(matches))

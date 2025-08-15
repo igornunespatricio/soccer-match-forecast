@@ -60,10 +60,13 @@ class SerieAScraper:
             "away": row.select_one("td[data-stat='away_team']").text.strip(),
             "attendance": row.select_one("td[data-stat='attendance']").text.strip(),
             "report_link": (
-                f"https://fbref.com{report_link['href']}" if report_link else None
+                f"https://fbref.com{report_link['href']}"
+                if report_link and "/en/matches/" in report_link["href"]
+                else None
             ),
         }
 
+    # TODO: add team_stats as string, not json, so don't have to parse later to insert into db
     def _extract_stats(self, soup: BeautifulSoup) -> tuple:
         """Extract team stats from match report"""
         stats = {}
@@ -93,6 +96,8 @@ class SerieAScraper:
         )
         return stats, extra_stats
 
+    # TODO: change url place to config.py
+    # TODO: SPIKE - add logic to url to scrap other leagues and championships
     def scrape_basic_match_data(self):
         """Scrape and save to database"""
         soup = self._get_page(
@@ -106,24 +111,35 @@ class SerieAScraper:
 
         logger.info(f"Saved basic match data to database")
 
-    def scrape_match_reports(self):
+    def scrape_match_reports(
+        self, has_team_stats: bool = False, has_extra_stats: bool = False
+    ):
         """Process unscraped matches"""
-        for match in self.db.get_all_matches():
-            if not match.get("team_stats") and match.get("report_link"):
-                try:
-                    report_soup = self._get_page(match["report_link"])
-                    team_stats, extra_stats = self._extract_stats(report_soup)
+        matches = self.db.get_matches(
+            year=str(self.year),
+            has_report_link=True,
+            has_team_stats=has_team_stats,
+            has_extra_stats=has_extra_stats,
+        )
+        logger.info(f"Scraping {len(matches)} matches for {self.year} season")
+        # TODO: add batch logging: log every 10 matches
+        for match in matches:
+            try:
+                report_soup = self._get_page(match["report_link"])
+                team_stats, extra_stats = self._extract_stats(report_soup)
 
-                    self.db.save_match(
-                        {
-                            **match,
-                            "team_stats": json.dumps(team_stats),
-                            "team_stats_extra": extra_stats,
-                        }
-                    )
-                    logger.info(f"Updated stats for {match['home']} vs {match['away']}")
-                except Exception as e:
-                    logger.error(f"Failed to scrape {match['report_link']}: {e}")
+                self.db.save_match(
+                    {
+                        **match,
+                        "team_stats": json.dumps(team_stats),
+                        "extra_stats": extra_stats,
+                    }
+                )
+                logger.info(
+                    f"Updated stats for {match['home']} vs {match['away']} - {match['report_link']}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to scrape {match['report_link']}: {e}")
 
 
 if __name__ == "__main__":
@@ -131,7 +147,7 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        scraper = SerieAScraper(driver, 2023)
+        scraper = SerieAScraper(driver, 2016)
         scraper.scrape_basic_match_data()
         scraper.scrape_match_reports()
 
