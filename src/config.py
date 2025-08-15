@@ -2,11 +2,12 @@ from pathlib import Path
 
 
 # Define raw data path
-RAW_DATA_PATH = Path(__file__).parent.parent / "data"
+RAW_DATA_PATH = Path(__file__).parent.parent / "data" / "raw"
+PROCESSED_DATA_PATH = Path(__file__).parent.parent / "data" / "processed"
 SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
 
 # YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
-YEARS = [2016, 2017, 2018]
+YEARS = [2016]
 
 # Define request delay and max retries for web requests
 REQUEST_DELAY = 7
