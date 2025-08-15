@@ -1,3 +1,4 @@
+import json
 import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
@@ -6,6 +7,7 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from database import DatabaseManager
 from webdriver import ChromeDriverWrapper
 from logger import get_logger
 from config import REQUEST_DELAY, MAX_RETRIES, RAW_DATA_PATH
@@ -29,8 +31,8 @@ class SerieAScraper:
     def __init__(self, driver, year: int):
         self.driver = driver
         self.year = year
-        self.matches = []
-        self.base_file_path = RAW_DATA_PATH / f"serie_a_{self.year}_results.csv"
+        self.db = DatabaseManager()
+        self.db.initialize_db()  # Ensure tables exist
 
     def _get_page(self, url: str) -> BeautifulSoup:
         """Load page with configured delay"""
@@ -91,188 +93,37 @@ class SerieAScraper:
         )
         return stats, extra_stats
 
-    def scrape_basic_match_data(self) -> None:
-        """Scrape basic match data, merging with existing data while preserving scraped reports"""
-        base_url = f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
-        soup = self._get_page(base_url)
+    def scrape_basic_match_data(self):
+        """Scrape and save to database"""
+        soup = self._get_page(
+            f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
+        )
 
-        # Scrape fresh basic data
-        new_matches = []
         for row in soup.select("table.stats_table tbody tr"):
             if match := self._extract_match_data(row):
-                new_matches.append(match)
-        new_df = pd.DataFrame(new_matches)
+                # Pass preserve_stats=True to keep existing stats
+                self.db.save_match(match, preserve_stats=True)
 
-        # Try to load existing data
-        existing_df = pd.DataFrame()
-        if self.base_file_path.exists():
-            try:
-                existing_df = pd.read_csv(self.base_file_path)
-                # Ensure required columns exist
-                for col in ["Team Stats", "Extra Stats"]:
-                    if col not in existing_df.columns:
-                        existing_df[col] = None
-            except (pd.errors.EmptyDataError, Exception) as e:
-                logger.warning(f"Could not read existing file: {e}")
+        logger.info(f"Saved basic match data to database")
 
-        # Merge data using report_link as key
-        if not existing_df.empty:
-            # Full outer join on report_link
-            merged_df = pd.merge(
-                new_df,
-                existing_df[["report_link", "Team Stats", "Extra Stats"]],
-                on="report_link",
-                how="outer",
-                suffixes=("", "_existing"),
-            )
-
-            # For matches with existing stats, keep them; otherwise use new data
-            final_df = pd.concat(
-                [
-                    # Existing matches with stats
-                    existing_df[existing_df["Team Stats"].notna()],
-                    # New matches or existing matches without stats
-                    new_df[
-                        ~new_df["report_link"].isin(
-                            existing_df[existing_df["Team Stats"].notna()][
-                                "report_link"
-                            ]
-                        )
-                    ],
-                ]
-            ).drop_duplicates("report_link")
-        else:
-            final_df = new_df
-
-        # Ensure standard columns
-        if "Team Stats" not in final_df.columns:
-            final_df["Team Stats"] = None
-        if "Extra Stats" not in final_df.columns:
-            final_df["Extra Stats"] = None
-
-        # Save merged data
-        final_df.to_csv(self.base_file_path, index=False)
-        logger.info(
-            f"Merged and saved {len(final_df)} matches to {self.base_file_path}"
-        )
-
-    def scrape_match_reports(self, max_matches=None) -> List[Match]:
-        """Scrape match reports incrementally while preserving existing data"""
-        try:
-            # Load existing data with proper type conversion
-            existing_df = pd.read_csv(
-                self.base_file_path,
-                converters={
-                    "Team Stats": lambda x: (
-                        eval(x) if pd.notna(x) and x not in ["", "N/A"] else {}
-                    ),
-                    "Extra Stats": lambda x: x if pd.notna(x) else "N/A",
-                },
-            )
-        except FileNotFoundError:
-            logger.error(
-                "No saved match data found. Run scrape_basic_match_data() first."
-            )
-            return []
-        except Exception as e:
-            logger.error(f"Error reading data file: {e}")
-            return []
-
-        # Convert to list of dicts for processing
-        all_matches = existing_df.to_dict("records")
-        total_matches = len(all_matches)
-        processed_count = sum(1 for m in all_matches if m.get("Team Stats"))
-
-        logger.info(
-            f"Resuming from {processed_count}/{total_matches} already processed matches"
-        )
-
-        for i, match in enumerate(all_matches):
-            if max_matches and i >= max_matches:
-                break
-
-            # Skip if already processed or missing report link
-            if not match.get("report_link") or match.get("Team Stats"):
-                continue
-
-            for attempt in range(MAX_RETRIES):
+    def scrape_match_reports(self):
+        """Process unscraped matches"""
+        for match in self.db.get_all_matches():
+            if not match.get("team_stats") and match.get("report_link"):
                 try:
-                    # Scrape match report
                     report_soup = self._get_page(match["report_link"])
                     team_stats, extra_stats = self._extract_stats(report_soup)
 
-                    # Update only this match's data in the DataFrame
-                    existing_df.loc[
-                        existing_df["report_link"] == match["report_link"],
-                        ["Team Stats", "Extra Stats"],
-                    ] = [str(team_stats), extra_stats]
-
-                    # Save incrementally after each successful scrape
-                    existing_df.to_csv(self.base_file_path, index=False)
-
-                    logger.info(
-                        f"({i+1}/{total_matches}) Scraped: {match['home']} vs {match['away']} | "
-                        f"Progress: {processed_count + 1}/{total_matches}"
+                    self.db.save_match(
+                        {
+                            **match,
+                            "team_stats": json.dumps(team_stats),
+                            "team_stats_extra": extra_stats,
+                        }
                     )
-                    processed_count += 1
-                    break
-
+                    logger.info(f"Updated stats for {match['home']} vs {match['away']}")
                 except Exception as e:
-                    if attempt == MAX_RETRIES - 1:
-                        logger.error(
-                            f"Failed after {MAX_RETRIES} attempts for match {i+1}: {e}\n"
-                            f"Match: {match['home']} vs {match['away']} | {match['report_link']}"
-                        )
-                        # Save progress even on failure to maintain position
-                        existing_df.to_csv(self.base_file_path, index=False)
-                    else:
-                        wait_time = REQUEST_DELAY * (attempt + 1)
-                        logger.warning(
-                            f"Attempt {attempt+1} failed for match {i+1}, "
-                            f"retrying in {wait_time}s..."
-                        )
-                        time.sleep(wait_time)
-
-        # Convert back to Match objects
-        self.matches = [
-            Match(
-                date=row["date"],
-                home=row["home"],
-                score=row["score"],
-                away=row["away"],
-                attendance=row["attendance"],
-                report_link=row["report_link"],
-                team_stats=(
-                    eval(row["Team Stats"]) if pd.notna(row["Team Stats"]) else {}
-                ),
-                team_stats_extra=row["Extra Stats"],
-            )
-            for _, row in existing_df.iterrows()
-        ]
-        return self.matches
-
-    def save_to_csv(self, filename):
-        """Save scraped matches to CSV"""
-        if not self.matches:
-            logger.warning("No matches to save")
-            return
-
-        pd.DataFrame(
-            [
-                {
-                    "Date": m.date,
-                    "Home": m.home,
-                    "Score": m.score,
-                    "Away": m.away,
-                    "Attendance": m.attendance,
-                    "Report Link": m.report_link,
-                    "Team Stats": m.team_stats,
-                    "Extra Stats": m.team_stats_extra,
-                }
-                for m in self.matches
-            ]
-        ).to_csv(filename, index=False)
-        logger.info(f"Saved {len(self.matches)} complete matches to {filename}")
+                    logger.error(f"Failed to scrape {match['report_link']}: {e}")
 
 
 if __name__ == "__main__":
@@ -280,16 +131,9 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        year = 2024
-        scraper = SerieAScraper(driver, year)
-
-        # Phase 1: Scrape basic match data
+        scraper = SerieAScraper(driver, 2023)
         scraper.scrape_basic_match_data()
-
-        # Phase 2: Scrape detailed reports
         scraper.scrape_match_reports()
 
-    except Exception as e:
-        logger.error(f"Scraping failed: {e}")
     finally:
         driver_manager.close()
