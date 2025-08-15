@@ -1,14 +1,35 @@
 from pathlib import Path
 
-
-# Define raw data path
+# ==========================================================================
+# Path definitons
+# ==========================================================================
 RAW_DATA_PATH = Path(__file__).parent.parent / "data" / "raw"
 PROCESSED_DATA_PATH = Path(__file__).parent.parent / "data" / "processed"
 SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
 
+# ==========================================================================
+# Web Scraper Configuration
+# ==========================================================================
 # YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 YEARS = [2016]
 
 # Define request delay and max retries for web requests
 REQUEST_DELAY = 7
 MAX_RETRIES = 3
+
+# ==========================================================================
+# Database Configuration
+# ==========================================================================
+DATABASE_CONFIG = {
+    "engine": "sqlite",  # Change to 'postgresql' for PostgreSQL
+    "sqlite_path": RAW_DATA_PATH / "matches.db",  # SQLite file path
+    "postgresql": {  # Only needed if using PostgreSQL
+        "host": "localhost",
+        "port": 5432,
+        "database": "seriea",
+        "user": "postgres",
+        "password": "yourpassword",
+    },
+}
+RAW_TABLE = "raw_matches"
+PROCESSED_TABLE = "processed_matches"
