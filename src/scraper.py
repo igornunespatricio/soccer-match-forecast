@@ -103,7 +103,7 @@ class SerieAScraper:
         soup = self._get_page(
             f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
         )
-
+        # TODO: add batch logging: log every 10 matches
         for row in soup.select("table.stats_table tbody tr"):
             if match := self._extract_match_data(row):
                 # Pass preserve_stats=True to keep existing stats
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        scraper = SerieAScraper(driver, 2016)
+        scraper = SerieAScraper(driver, 2025)
         scraper.scrape_basic_match_data()
         scraper.scrape_match_reports()
 

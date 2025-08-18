@@ -276,6 +276,6 @@ if __name__ == "__main__":
 
     # testing get matches
     matches = db.get_matches(
-        year="2023", has_team_stats=True, has_report_link=True, has_extra_stats=False
+        year="2024", has_team_stats=True, has_report_link=True, has_extra_stats=True
     )
     print("Number of matches scraped: ", len(matches))
