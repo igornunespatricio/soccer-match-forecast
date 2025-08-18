@@ -3,7 +3,7 @@ import sqlite3
 import json
 from contextlib import contextmanager
 import time
-from config import DATABASE_CONFIG, RAW_DATA_PATH, RAW_TABLE
+from config import DATABASE_CONFIG, RAW_TABLE, TRANSFORMED_TABLE
 from logger import get_logger
 
 logger = get_logger("Database")
@@ -66,6 +66,11 @@ class DatabaseManager:
                 f"CREATE INDEX IF NOT EXISTS idx_date_added ON {RAW_TABLE}(date_added)"
             )
             conn.commit()
+
+    def _delete_table(self, table_name):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
 
     def save_match(
         self, match: dict, load_id: str = None, preserve_stats: bool = False
@@ -269,13 +274,87 @@ class DatabaseManager:
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
+    # database.py (add this method to the DatabaseManager class)
+    def initialize_transformed_db(self):
+        """Create transformed table with all structured columns"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
+                    -- Original match data
+                    date TEXT,
+                    home_team TEXT,
+                    away_team TEXT,
+                    home_score INTEGER,
+                    away_score INTEGER,
+                    attendance INTEGER,
+                    report_link TEXT UNIQUE,
+                    
+                    -- Transformed team stats
+                    home_possession REAL,
+                    away_possession REAL,
+                    home_passing_accuracy REAL,
+                    away_passing_accuracy REAL,
+                    home_shots_on_target INTEGER,
+                    away_shots_on_target INTEGER,
+                    home_saves INTEGER,
+                    away_saves INTEGER,
+                    home_cards INTEGER,
+                    away_cards INTEGER,
+                    
+                    -- Transformed extra stats
+                    home_fouls INTEGER,
+                    away_fouls INTEGER,
+                    home_corners INTEGER,
+                    away_corners INTEGER,
+                    home_crosses INTEGER,
+                    away_crosses INTEGER,
+                    home_touches INTEGER,
+                    away_touches INTEGER,
+                    home_tackles INTEGER,
+                    away_tackles INTEGER,
+                    home_interceptions INTEGER,
+                    away_interceptions INTEGER,
+                    home_aerials_won INTEGER,
+                    away_aerials_won INTEGER,
+                    home_clearances INTEGER,
+                    away_clearances INTEGER,
+                    home_offsides INTEGER,
+                    away_offsides INTEGER,
+                    home_goal_kicks INTEGER,
+                    away_goal_kicks INTEGER,
+                    home_throw_ins INTEGER,
+                    away_throw_ins INTEGER,
+                    home_long_balls INTEGER,
+                    away_long_balls INTEGER,
+                    
+                    -- Metadata
+                    date_added TIMESTAMP,
+                    data_source TEXT,
+                    load_id TEXT,
+                    checksum TEXT,
+                    version INTEGER,
+                    last_updated TIMESTAMP,
+                    
+                    PRIMARY KEY (report_link)
+                )
+                """
+            )
+
+            # Create indexes
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_transformed_date ON {TRANSFORMED_TABLE}(date)"
+            )
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_transformed_home ON {TRANSFORMED_TABLE}(home_team)"
+            )
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_transformed_away ON {TRANSFORMED_TABLE}(away_team)"
+            )
+            conn.commit()
+
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    db.initialize_db()
-
-    # testing get matches
-    matches = db.get_matches(
-        year="2024", has_team_stats=True, has_report_link=True, has_extra_stats=True
-    )
-    print("Number of matches scraped: ", len(matches))
+    db._delete_table(TRANSFORMED_TABLE)
