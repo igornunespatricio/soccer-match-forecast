@@ -14,15 +14,12 @@ class DataTransformer:
         self.initialize_transformed_table()
 
     def initialize_transformed_table(self):
-        """Initialize the transformed table with all columns"""
+        """Initialize the transformed table only if it doesn't exist"""
         with self.db_manager.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                f"DROP TABLE IF EXISTS {TRANSFORMED_TABLE}"
-            )  # Clear existing table
-            cursor.execute(
                 f"""
-                CREATE TABLE {TRANSFORMED_TABLE} (
+                CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
                     -- Basic match info
                     date TEXT,
                     home_team TEXT,
@@ -93,7 +90,9 @@ class DataTransformer:
                 """
             )
             conn.commit()
-            logger.info(f"Initialized {TRANSFORMED_TABLE}")
+            logger.info(
+                f"Verified {TRANSFORMED_TABLE} exists (created if didn't exist)"
+            )
 
     @staticmethod
     def parse_score(score_str: str) -> tuple:
@@ -251,23 +250,72 @@ class DataTransformer:
             logger.error(f"Error transforming match: {str(e)}")
             return None
 
-    def transform_all_matches(self):
-        """Transform and load all matches from raw table"""
-        logger.info("Starting full transformation of all matches")
+    def transform_all_matches(self, year: Optional[str] = None):
+        """Transform only new matches from raw table that don't exist in transformed table
+
+        Args:
+            year: Optional filter to only process matches from specific year (YYYY format)
+        """
+        logger.info("Starting transformation of new matches")
+        logger.info(f"Year filter: {year if year else 'None'}")
 
         with self.db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {RAW_TABLE}")
-            raw_matches = [dict(row) for row in cursor.fetchall()]
+
+            # First get all existing report links from transformed table
+            cursor.execute(f"SELECT report_link FROM {TRANSFORMED_TABLE}")
+            existing_links = {row[0] for row in cursor.fetchall()}
+
+            # Build query for raw table
+            query = f"SELECT * FROM {RAW_TABLE}"
+            conditions = []
+
+            # Filter out already processed matches
+            if existing_links:
+                # Create NOT IN clause with all existing links
+                placeholders = ",".join(["?"] * len(existing_links))
+                conditions.append(f"report_link NOT IN ({placeholders})")
+
+            # Add year filter if specified
+            if year:
+                conditions.append(f"date LIKE '{year}%'")
+
+            # Combine conditions
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            # Execute with parameters if needed
+            if existing_links:
+                cursor.execute(query, tuple(existing_links))
+            else:
+                cursor.execute(query)
+
+            new_matches = [dict(row) for row in cursor.fetchall()]
+
+        total_new = len(new_matches)
+        if not total_new:
+            logger.info("No new matches found to transform")
+            return 0
+
+        logger.info(f"Found {total_new} new matches to transform")
 
         success = 0
-        for match in raw_matches:
+        for index, match in enumerate(new_matches, 1):
             transformed = self.transform_match(match)
             if transformed:
                 self.save_transformed_match(transformed)
                 success += 1
 
-        logger.info(f"Transformation complete. Success: {success}/{len(raw_matches)}")
+            # Log progress every 50 matches or at end
+            if index % 50 == 0 or index == total_new:
+                logger.info(
+                    f"Progress: {index}/{total_new} new matches transformed "
+                    f"({success} successful)"
+                )
+
+        logger.info(
+            f"Finished. Successfully processed {success}/{total_new} new matches"
+        )
         return success
 
     def save_transformed_match(self, transformed: dict):
@@ -370,5 +418,5 @@ if __name__ == "__main__":
     transformer = DataTransformer()
 
     # Run either test or full transformation
-    transformer.test_transform_10_rows()
-    # transformer.transform_all_matches()
+    # transformer.test_transform_10_rows()
+    transformer.transform_all_matches()
