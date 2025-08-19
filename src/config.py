@@ -32,4 +32,4 @@ DATABASE_CONFIG = {
     },
 }
 RAW_TABLE = "raw_matches"
-PROCESSED_TABLE = "processed_matches"
+TRANSFORMED_TABLE = "transformed_matches"
