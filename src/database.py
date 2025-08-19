@@ -53,7 +53,9 @@ class DatabaseManager:
                     is_current BOOLEAN DEFAULT TRUE,
                     checksum TEXT,
                     version INTEGER DEFAULT 1,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                    PRIMARY KEY (report_link)
                 )
             """
             )
@@ -357,4 +359,4 @@ class DatabaseManager:
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    db._delete_table(TRANSFORMED_TABLE)
+    db._delete_table(RAW_TABLE)

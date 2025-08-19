@@ -66,22 +66,9 @@ class SerieAScraper:
             ),
         }
 
-    # TODO: add team_stats as string, not json, so don't have to parse later to insert into db
     def _extract_stats(self, soup: BeautifulSoup) -> tuple:
-        """Extract team stats from match report"""
-        stats = {}
-        current_label = None
-
-        if stats_div := soup.find("div", id="team_stats"):
-            for row in stats_div.find_all("tr"):
-                if (th := row.find("th")) and th.get("colspan") == "2":
-                    current_label = th.get_text(strip=True)
-                elif current_label and (tds := row.find_all("td")) and len(tds) == 2:
-                    stats[current_label] = {
-                        "home": tds[0].get_text(strip=True),
-                        "away": tds[1].get_text(strip=True),
-                    }
-
+        """Extract team stats text from match report"""
+        stats_text = []
         extra_stats = (
             " | ".join(
                 item.get_text(strip=True)
@@ -94,7 +81,29 @@ class SerieAScraper:
             if soup.find("div", id="team_stats_extra")
             else "N/A"
         )
-        return stats, extra_stats
+
+        if stats_div := soup.find("div", id="team_stats"):
+            # Extract team names
+            teams = [
+                th.get_text(strip=True)
+                for th in stats_div.find_all("th")
+                if not th.get("colspan")
+            ]
+            if teams:
+                stats_text.append(f"{teams[0]} vs {teams[1]}")
+
+            # Extract all stats
+            for row in stats_div.find_all("tr"):
+                if th := row.find("th"):
+                    if th.get("colspan") == "2":
+                        stats_text.append(f"\n{th.get_text(strip=True)}")
+                elif tds := row.find_all("td"):
+                    if len(tds) == 2:
+                        home = tds[0].get_text(" ", strip=True)
+                        away = tds[1].get_text(" ", strip=True)
+                        stats_text.append(f"Home: {home} | Away: {away}")
+
+        return "\n".join(stats_text), extra_stats
 
     # TODO: change url place to config.py
     # TODO: SPIKE - add logic to url to scrap other leagues and championships
@@ -147,7 +156,7 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        scraper = SerieAScraper(driver, 2025)
+        scraper = SerieAScraper(driver, 2016)
         scraper.scrape_basic_match_data()
         scraper.scrape_match_reports()
 
