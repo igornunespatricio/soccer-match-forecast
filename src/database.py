@@ -38,10 +38,10 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS {RAW_TABLE} (
                     -- Match data
                     report_link TEXT UNIQUE,
-                    date TEXT,
-                    home TEXT,
+                    date TEXT NOT NULL,
+                    home TEXT NOT NULL,
                     score TEXT,
-                    away TEXT,
+                    away TEXT NOT NULL,
                     attendance TEXT,
                     team_stats TEXT,
                     extra_stats TEXT,
@@ -50,14 +50,17 @@ class DatabaseManager:
                     date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-                    PRIMARY KEY (report_link)
+                    PRIMARY KEY (date, home, away)  -- Composite primary key
                 )
-            """
+                """
             )
 
             # Create indexes
             cursor.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_report_link ON {RAW_TABLE}(report_link)"
+            )
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_match_composite ON {RAW_TABLE}(date, home, away)"
             )
             conn.commit()
 

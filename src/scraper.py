@@ -34,10 +34,11 @@ class SerieAScraper:
     def scrape_basic_match_data(self):
         """Scrape and save to database"""
         soup = self._get_page(self.url)
-        count = 0
-        for row in soup.select(
+        rows = soup.select(
             "table.stats_table tbody tr[data-row]:not(.spacer.partial_table.result_all, .thead)"
-        ):
+        )
+        logger.info(f"Found {len(rows)} matches to scrape")
+        for row in rows:
 
             if match := self._extract_match_data(row):
                 print(match)
@@ -53,10 +54,9 @@ class SerieAScraper:
                         match["report_link"],
                     ),
                 )
-                count += 1
-            if count >= 5:
-                break
-        logger.info(f"Saved basic match data to database")
+                logger.info(
+                    f"Saved {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
+                )
 
     def _get_page(self, url: str) -> BeautifulSoup:
         """Load page with configured delay"""
@@ -70,25 +70,31 @@ class SerieAScraper:
 
     def _extract_match_data(self, row) -> Optional[Dict]:
         """Extract basic match info from schedule row"""
-        if (
-            not (score := row.select_one("td[data-stat='score']"))
-            or not score.text.strip()
-        ):
-            return None
 
+        def clean_text(text):
+            """Remove leading and trailing spaces and return None if text is empty"""
+            text = text.strip()
+            return text if text != "" else None
+
+        date = clean_text(row.select_one("td[data-stat='date']").text)
+        home = clean_text(row.select_one("td[data-stat='home_team']").text)
+        score = clean_text(row.select_one("td[data-stat='score']").text)
+        away = clean_text(row.select_one("td[data-stat='away_team']").text)
+        attendance = clean_text(row.select_one("td[data-stat='attendance']").text)
         report_link = row.select_one('td[data-stat="match_report"] a')
-        return {
-            "date": row.select_one("td[data-stat='date']").text.strip(),
-            "home": row.select_one("td[data-stat='home_team']").text.strip(),
-            "score": score.text.strip(),
-            "away": row.select_one("td[data-stat='away_team']").text.strip(),
-            "attendance": row.select_one("td[data-stat='attendance']").text.strip(),
-            "report_link": (
-                f"https://fbref.com{report_link['href']}"
-                if report_link and "/en/matches/" in report_link["href"]
-                else None
-            ),
+        if report_link and "/en/matches/" in report_link["href"]:
+            report_link = f'https://fbref.com{report_link["href"]}'
+        else:
+            report_link = None
+        results = {
+            "date": date,
+            "home": home,
+            "score": score,
+            "away": away,
+            "attendance": attendance,
+            "report_link": report_link,
         }
+        return results
 
     def _extract_stats(self, soup: BeautifulSoup) -> tuple:
         """Extract team stats text from match report"""
