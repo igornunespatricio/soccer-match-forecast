@@ -3,8 +3,7 @@ from pathlib import Path
 # ==========================================================================
 # Path definitons
 # ==========================================================================
-RAW_DATA_PATH = Path(__file__).parent.parent / "data" / "raw"
-PROCESSED_DATA_PATH = Path(__file__).parent.parent / "data" / "processed"
+DATABASE_PATH = Path(__file__).parent.parent / "data"
 SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
 
 # ==========================================================================
@@ -22,7 +21,7 @@ MAX_RETRIES = 3
 # ==========================================================================
 DATABASE_CONFIG = {
     "engine": "sqlite",  # Change to 'postgresql' for PostgreSQL
-    "sqlite_path": RAW_DATA_PATH / "matches.db",  # SQLite file path
+    "sqlite_path": DATABASE_PATH / "matches.db",  # SQLite file path
     "postgresql": {  # Only needed if using PostgreSQL
         "host": "localhost",
         "port": 5432,

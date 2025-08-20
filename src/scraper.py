@@ -23,7 +23,7 @@ class Match:
     away: str
     attendance: str
     report_link: str
-    team_stats: Dict
+    team_stats: str
     team_stats_extra: str
 
 
