@@ -1,8 +1,6 @@
-import json
 import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-import pandas as pd
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -10,7 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from database import DatabaseManager
 from webdriver import ChromeDriverWrapper
 from logger import get_logger
-from config import REQUEST_DELAY, MAX_RETRIES, RAW_DATA_PATH
+from config import REQUEST_DELAY, URLS, RAW_TABLE
 
 logger = get_logger("SerieAScraper")
 
@@ -28,11 +26,37 @@ class Match:
 
 
 class SerieAScraper:
-    def __init__(self, driver, year: int):
+    def __init__(self, driver, url: str):
         self.driver = driver
-        self.year = year
+        self.url = url
         self.db = DatabaseManager()
-        self.db.initialize_db()  # Ensure tables exist
+
+    def scrape_basic_match_data(self):
+        """Scrape and save to database"""
+        soup = self._get_page(self.url)
+        count = 0
+        for row in soup.select(
+            "table.stats_table tbody tr[data-row]:not(.spacer.partial_table.result_all, .thead)"
+        ):
+
+            if match := self._extract_match_data(row):
+                print(match)
+                self.db.execute_query(
+                    f"INSERT OR IGNORE INTO {RAW_TABLE} (date, home, score, away, attendance, report_link) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        match["date"],
+                        match["home"],
+                        match["score"],
+                        match["away"],
+                        match["attendance"],
+                        match["report_link"],
+                    ),
+                )
+                count += 1
+            if count >= 5:
+                break
+        logger.info(f"Saved basic match data to database")
 
     def _get_page(self, url: str) -> BeautifulSoup:
         """Load page with configured delay"""
@@ -68,87 +92,11 @@ class SerieAScraper:
 
     def _extract_stats(self, soup: BeautifulSoup) -> tuple:
         """Extract team stats text from match report"""
-        stats_text = []
-        extra_stats = (
-            " | ".join(
-                item.get_text(strip=True)
-                for block in soup.find("div", id="team_stats_extra").find_all(
-                    "div", recursive=False
-                )
-                for item in block.find_all("div")
-                if "th" not in item.get("class", [])
-            )
-            if soup.find("div", id="team_stats_extra")
-            else "N/A"
-        )
+        pass
 
-        if stats_div := soup.find("div", id="team_stats"):
-            # Extract team names
-            teams = [
-                th.get_text(strip=True)
-                for th in stats_div.find_all("th")
-                if not th.get("colspan")
-            ]
-            if teams:
-                stats_text.append(f"{teams[0]} vs {teams[1]}")
-
-            # Extract all stats
-            for row in stats_div.find_all("tr"):
-                if th := row.find("th"):
-                    if th.get("colspan") == "2":
-                        stats_text.append(f"\n{th.get_text(strip=True)}")
-                elif tds := row.find_all("td"):
-                    if len(tds) == 2:
-                        home = tds[0].get_text(" ", strip=True)
-                        away = tds[1].get_text(" ", strip=True)
-                        stats_text.append(f"Home: {home} | Away: {away}")
-
-        return "\n".join(stats_text), extra_stats
-
-    # TODO: change url place to config.py
-    # TODO: SPIKE - add logic to url to scrap other leagues and championships
-    def scrape_basic_match_data(self):
-        """Scrape and save to database"""
-        soup = self._get_page(
-            f"https://fbref.com/en/comps/24/{self.year}/schedule/{self.year}-Serie-A-Scores-and-Fixtures"
-        )
-        # TODO: add batch logging: log every 10 matches
-        for row in soup.select("table.stats_table tbody tr"):
-            if match := self._extract_match_data(row):
-                # Pass preserve_stats=True to keep existing stats
-                self.db.save_match(match, preserve_stats=True)
-
-        logger.info(f"Saved basic match data to database")
-
-    def scrape_match_reports(
-        self, has_team_stats: bool = False, has_extra_stats: bool = False
-    ):
-        """Process unscraped matches"""
-        matches = self.db.get_matches(
-            year=str(self.year),
-            has_report_link=True,
-            has_team_stats=has_team_stats,
-            has_extra_stats=has_extra_stats,
-        )
-        logger.info(f"Scraping {len(matches)} matches for {self.year} season")
-        # TODO: add batch logging: log every 10 matches
-        for match in matches:
-            try:
-                report_soup = self._get_page(match["report_link"])
-                team_stats, extra_stats = self._extract_stats(report_soup)
-
-                self.db.save_match(
-                    {
-                        **match,
-                        "team_stats": json.dumps(team_stats),
-                        "extra_stats": extra_stats,
-                    }
-                )
-                logger.info(
-                    f"Updated stats for {match['home']} vs {match['away']} - {match['report_link']}"
-                )
-            except Exception as e:
-                logger.error(f"Failed to scrape {match['report_link']}: {e}")
+    def scrape_match_reports(self):
+        """Scrape match reports and save to database"""
+        pass
 
 
 if __name__ == "__main__":
@@ -156,7 +104,7 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        scraper = SerieAScraper(driver, 2016)
+        scraper = SerieAScraper(driver, url=URLS[0])
         scraper.scrape_basic_match_data()
         scraper.scrape_match_reports()
 

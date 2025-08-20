@@ -139,17 +139,22 @@ class DatabaseManager:
             self._delete_table(table_name)
 
     def _delete_table(self, table_name):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+        self.execute_query(f"DROP TABLE IF EXISTS {table_name}")
 
-    def execute_query(self, query: str):
+    def _delete_all_data(self, table_name):
+        self.execute_query(f"DELETE FROM {table_name}")
+
+    def execute_query(self, query: str, params: tuple = None):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query)
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
             conn.commit()
 
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    db._delete_tables([RAW_TABLE, TRANSFORMED_TABLE])
+    db.initialize_db()
+    # db._delete_tables([RAW_TABLE, TRANSFORMED_TABLE])
