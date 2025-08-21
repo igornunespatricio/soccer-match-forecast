@@ -96,9 +96,21 @@ class SerieAScraper:
         }
         return results
 
-    def _extract_stats(self, soup: BeautifulSoup) -> tuple:
-        """Extract team stats text from match report"""
-        pass
+    # TODO: create method for team stats
+    def _extract_team_stats(self, soup: BeautifulSoup):
+        """Extract team_stats from report link"""
+        team_stats_div = soup.select_one("div#team_stats")
+        if team_stats_div:
+            return str(team_stats_div)
+        return None
+
+    # TODO: create method for extra stats
+    def _extract_extra_stats(self, soup: BeautifulSoup):
+        """Extract extra_stats from report link"""
+        team_extra_stats_div = soup.select_one("div#team_stats_extra")
+        if team_extra_stats_div:
+            return str(team_extra_stats_div)
+        return None
 
     def scrape_match_reports(self):
         """Scrape match reports and save to database"""
@@ -108,10 +120,21 @@ class SerieAScraper:
         )
         count = 0
         for match in matches:
-            report_link = match["report_link"]
-            print(report_link)
+            soup = self._get_page(match["report_link"])
+            team_stats = self._extract_team_stats(soup)
+            extra_stats = self._extract_extra_stats(soup)
+
+            self.db.execute_query(
+                f"UPDATE {RAW_TABLE} SET team_stats = ?, extra_stats = ? WHERE report_link = ?",
+                (team_stats, extra_stats, match["report_link"]),
+            )
+
+            logger.info(
+                f"Saved team stats and extra stats for {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
+            )
             count += 1
-            if count >= 3:
+
+            if count >= 1:
                 break
 
 

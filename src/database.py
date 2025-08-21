@@ -164,7 +164,3 @@ if __name__ == "__main__":
     db = DatabaseManager()
     # db.initialize_db()
     # db._delete_tables([RAW_TABLE, TRANSFORMED_TABLE])
-    result = db.execute_query(
-        "SELECT * FROM raw_matches WHERE report_link IS NOT NULL AND team_stats IS NULL AND extra_stats IS NULL"
-    )
-    print(len(result))
