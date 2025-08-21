@@ -108,7 +108,6 @@ class SerieAScraper:
             logger.error(f"Error extracting match data: {e}")
         return None
 
-    # TODO: create method for team stats
     def _extract_team_stats(self, soup: BeautifulSoup):
         """Extract team_stats from report link"""
         try:
@@ -119,7 +118,6 @@ class SerieAScraper:
             logger.error(f"Error extracting team stats: {e}")
         return None
 
-    # TODO: create method for extra stats
     def _extract_extra_stats(self, soup: BeautifulSoup):
         """Extract extra_stats from report link"""
         try:
@@ -138,7 +136,7 @@ class SerieAScraper:
                 query += f" AND date LIKE '{year}%'"
             matches = self.db.execute_query(query)
             logger.info(f"Found {len(matches)} matches to scrape")
-            for match in matches:
+            for i, match in enumerate(matches):
                 soup = self._get_page(match["report_link"])
                 team_stats = self._extract_team_stats(soup)
                 extra_stats = self._extract_extra_stats(soup)
@@ -149,7 +147,7 @@ class SerieAScraper:
                 )
 
                 logger.info(
-                    f"Saved team stats and extra stats for {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
+                    f"Match {i+1}/{len(matches)} - Saved team stats and extra stats - {match['home']} {match['score']} {match['away']} - {match['report_link']}"
                 )
 
         except Exception as e:
