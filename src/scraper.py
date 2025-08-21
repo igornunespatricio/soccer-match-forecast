@@ -102,7 +102,17 @@ class SerieAScraper:
 
     def scrape_match_reports(self):
         """Scrape match reports and save to database"""
-        pass
+        # query the database to get report links with no team_stats or extra_stats
+        matches = self.db.execute_query(
+            f"SELECT * FROM {RAW_TABLE} WHERE report_link IS NOT NULL AND team_stats IS NULL AND extra_stats IS NULL"
+        )
+        count = 0
+        for match in matches:
+            report_link = match["report_link"]
+            print(report_link)
+            count += 1
+            if count >= 3:
+                break
 
 
 if __name__ == "__main__":
@@ -111,7 +121,7 @@ if __name__ == "__main__":
 
     try:
         scraper = SerieAScraper(driver, url=URLS[0])
-        scraper.scrape_basic_match_data()
+        # scraper.scrape_basic_match_data()
         scraper.scrape_match_reports()
 
     finally:

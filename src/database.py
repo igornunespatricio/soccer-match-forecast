@@ -147,17 +147,24 @@ class DatabaseManager:
     def _delete_all_data(self, table_name):
         self.execute_query(f"DELETE FROM {table_name}")
 
-    def execute_query(self, query: str, params: tuple = None):
+    def execute_query(self, query: str, params: tuple = None) -> list[sqlite3.Row]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
+            results = cursor.fetchall()
             conn.commit()
+
+        return results
 
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    db.initialize_db()
+    # db.initialize_db()
     # db._delete_tables([RAW_TABLE, TRANSFORMED_TABLE])
+    result = db.execute_query(
+        "SELECT * FROM raw_matches WHERE report_link IS NOT NULL AND team_stats IS NULL AND extra_stats IS NULL"
+    )
+    print(len(result))
