@@ -26,27 +26,29 @@ class Match:
 
 
 class SerieAScraper:
-    def __init__(self, driver, url: str):
+    def __init__(self, driver: ChromeDriverWrapper):
         self.driver = driver
-        self.url = url
         self.db = DatabaseManager()
 
-    def scrape_basic_match_data(self):
+    def scrape_basic_match_data(self, url: str):
         """Scrape and save to database"""
         try:
-
-            soup = self._get_page(self.url)
+            soup = self._get_page(url)
             rows = soup.select(
                 "table.stats_table tbody tr[data-row]:not(.spacer.partial_table.result_all, .thead)"
             )
             logger.info(f"Found {len(rows)} matches to scrape")
-            for row in rows:
-
+            for i, row in enumerate(rows):
                 if match := self._extract_match_data(row):
-                    print(match)
                     self.db.execute_query(
-                        f"INSERT OR IGNORE INTO {RAW_TABLE} (date, home, score, away, attendance, report_link) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO raw_matches (date, home, score, away, attendance, report_link) "
+                        "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                        "ON CONFLICT(date, home, away) DO UPDATE SET "
+                        "score = COALESCE(score, excluded.score), "
+                        "report_link = COALESCE(report_link, excluded.report_link), "
+                        "attendance = excluded.attendance "
+                        "last_updated = CURRENT_TIMESTAMP "
+                        "WHERE score IS NULL OR report_link IS NULL",
                         (
                             match["date"],
                             match["home"],
@@ -57,7 +59,7 @@ class SerieAScraper:
                         ),
                     )
                     logger.info(
-                        f"Saved {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
+                        f"Saved match {i+1}/{len(rows)}: {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
                     )
         except Exception as e:
             logger.error(f"Error while scraping basic match data: {e}")
@@ -142,7 +144,7 @@ class SerieAScraper:
                 extra_stats = self._extract_extra_stats(soup)
 
                 self.db.execute_query(
-                    f"UPDATE {RAW_TABLE} SET team_stats = ?, extra_stats = ? WHERE report_link = ?",
+                    f"UPDATE {RAW_TABLE} SET team_stats = ?, extra_stats = ?, last_updated = CURRENT_TIMESTAMP WHERE report_link = ?",
                     (team_stats, extra_stats, match["report_link"]),
                 )
 
@@ -159,8 +161,8 @@ if __name__ == "__main__":
     driver = driver_manager.get_driver()
 
     try:
-        scraper = SerieAScraper(driver, url=URLS[0])
-        # scraper.scrape_basic_match_data()
+        scraper = SerieAScraper(driver)
+        scraper.scrape_basic_match_data(url=URLS[0])
         scraper.scrape_match_reports(year=2025)
 
     finally:
