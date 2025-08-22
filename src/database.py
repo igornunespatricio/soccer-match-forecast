@@ -72,20 +72,26 @@ class DatabaseManager:
                 f"""
                 CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
                     -- Original match data
+                    date DATE NOT NULL,
+                    home TEXT NOT NULL,
+                    home_score INT NOT NULL,
+                    away_score INT NOT NULL,
+                    away TEXT NOT NULL,
+                    attendance INT,
                     report_link TEXT NOT NULL UNIQUE,
                     
                     -- Transformed team stats
                     home_possession REAL,
                     away_possession REAL,
-                    home_passing_attemps INTEGER,
+                    home_passes_attempts INTEGER,
                     home_passes_completed INTEGER,
-                    away_passing_attemps INTEGER,
+                    away_passes_attempts INTEGER,
                     away_passes_completed INTEGER,
-                    home_shots_attemps INTEGER,
+                    home_shots_attempts INTEGER,
                     home_shots_on_target INTEGER,
-                    away_shots_attemps INTEGER,
+                    away_shots_attempts INTEGER,
                     away_shots_on_target INTEGER,
-                    home_saves_attemps INTEGER,
+                    home_saves_attempts INTEGER,
                     home_saves_completed INTEGER,
                     away_saves_attempts INTEGER,
                     away_saves_completed INTEGER,
@@ -117,8 +123,8 @@ class DatabaseManager:
                     away_long_balls INTEGER,
                     
                     -- Metadata
-                    date_added TIMESTAMP,
-                    last_updated TIMESTAMP,
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     
                     PRIMARY KEY (report_link)
                 )
@@ -162,5 +168,6 @@ class DatabaseManager:
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    # db.initialize_db()
-    # db._delete_tables([RAW_TABLE, TRANSFORMED_TABLE])
+    db.initialize_db()
+    # db._delete_all_data(TRANSFORMED_TABLE)
+    # db._delete_table(TRANSFORMED_TABLE)

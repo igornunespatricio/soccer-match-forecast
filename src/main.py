@@ -17,7 +17,7 @@ def main():
 
             # Scrape
             scraper = SerieAScraper(driver)
-            scraper.scrape_basic_match_data(url=url)
+            # scraper.scrape_basic_match_data(url=url)
             # scraper.scrape_match_reports()
     finally:
         driver_manager.close()

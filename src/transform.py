@@ -1,422 +1,159 @@
-import json
-import re
-from typing import Optional
+from dataclasses import dataclass
 from database import DatabaseManager
 from config import RAW_TABLE, TRANSFORMED_TABLE
 from logger import get_logger
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from typing import Optional
 
 logger = get_logger("Transformer")
 
 
+@dataclass
+class Match:
+    # Original match data
+    date: date
+    home: str
+    home_score: int
+    away_score: int
+    away: str
+    report_link: str
+    attendance: Optional[int] = None
+
+    # Transformed team stats
+    home_possession: Optional[float] = None
+    away_possession: Optional[float] = None
+    home_passes_attempts: Optional[int] = None
+    home_passes_completed: Optional[int] = None
+    away_passes_attempts: Optional[int] = None
+    away_passes_completed: Optional[int] = None
+    home_shots_attempts: Optional[int] = None
+    home_shots_on_target: Optional[int] = None
+    away_shots_attempts: Optional[int] = None
+    away_shots_on_target: Optional[int] = None
+    home_saves_attempts: Optional[int] = None
+    home_saves_completed: Optional[int] = None
+    away_saves_attempts: Optional[int] = None
+    away_saves_completed: Optional[int] = None
+
+    # Transformed extra stats
+    home_fouls: Optional[int] = None
+    away_fouls: Optional[int] = None
+    home_corners: Optional[int] = None
+    away_corners: Optional[int] = None
+    home_crosses: Optional[int] = None
+    away_crosses: Optional[int] = None
+    home_touches: Optional[int] = None
+    away_touches: Optional[int] = None
+    home_tackles: Optional[int] = None
+    away_tackles: Optional[int] = None
+    home_interceptions: Optional[int] = None
+    away_interceptions: Optional[int] = None
+    home_aerials_won: Optional[int] = None
+    away_aerials_won: Optional[int] = None
+    home_clearances: Optional[int] = None
+    away_clearances: Optional[int] = None
+    home_offsides: Optional[int] = None
+    away_offsides: Optional[int] = None
+    home_goal_kicks: Optional[int] = None
+    away_goal_kicks: Optional[int] = None
+    home_throw_ins: Optional[int] = None
+    away_throw_ins: Optional[int] = None
+    home_long_balls: Optional[int] = None
+    away_long_balls: Optional[int] = None
+
+    # Metadata
+    date_added: Optional[datetime] = field(default_factory=datetime.now)
+    last_updated: Optional[datetime] = field(default_factory=datetime.now)
+
+    def update_stats(self, team_stats: dict, extra_stats: dict):
+        """Update the match instance with team and extra stats"""
+        for key, value in {**team_stats, **extra_stats}.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+
 class DataTransformer:
     def __init__(self):
-        self.db_manager = DatabaseManager()
-        self.initialize_transformed_table()
+        self.db = DatabaseManager()
 
-    def initialize_transformed_table(self):
-        """Initialize the transformed table only if it doesn't exist"""
-        with self.db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
-                    -- Basic match info
-                    date TEXT,
-                    home_team TEXT,
-                    away_team TEXT,
-                    home_score INTEGER,
-                    away_score INTEGER,
-                    attendance INTEGER,
-                    report_link TEXT UNIQUE,
-                    
-                    -- Possession
-                    home_possession REAL,
-                    away_possession REAL,
-                    
-                    -- Passing
-                    home_passes_completed INTEGER,
-                    home_passes_attempted INTEGER,
-                    away_passes_completed INTEGER,
-                    away_passes_attempted INTEGER,
-                    
-                    -- Shots
-                    home_shots_on_target INTEGER,
-                    home_shots_attempted INTEGER,
-                    away_shots_on_target INTEGER,
-                    away_shots_attempted INTEGER,
-                    
-                    -- Saves
-                    home_saves_made INTEGER,
-                    home_saves_attempted INTEGER,
-                    away_saves_made INTEGER,
-                    away_saves_attempted INTEGER,
-                    
-                    -- Extra stats
-                    home_fouls INTEGER,
-                    away_fouls INTEGER,
-                    home_corners INTEGER,
-                    away_corners INTEGER,
-                    home_crosses INTEGER,
-                    away_crosses INTEGER,
-                    home_touches INTEGER,
-                    away_touches INTEGER,
-                    home_tackles INTEGER,
-                    away_tackles INTEGER,
-                    home_interceptions INTEGER,
-                    away_interceptions INTEGER,
-                    home_aerials_won INTEGER,
-                    away_aerials_won INTEGER,
-                    home_clearances INTEGER,
-                    away_clearances INTEGER,
-                    home_offsides INTEGER,
-                    away_offsides INTEGER,
-                    home_goal_kicks INTEGER,
-                    away_goal_kicks INTEGER,
-                    home_throw_ins INTEGER,
-                    away_throw_ins INTEGER,
-                    home_long_balls INTEGER,
-                    away_long_balls INTEGER,
-                    
-                    -- Metadata
-                    date_added TIMESTAMP,
-                    data_source TEXT,
-                    load_id TEXT,
-                    checksum TEXT,
-                    version INTEGER,
-                    last_updated TIMESTAMP,
-                    
-                    PRIMARY KEY (report_link)
-                )
-                """
-            )
-            conn.commit()
-            logger.info(
-                f"Verified {TRANSFORMED_TABLE} exists (created if didn't exist)"
-            )
-
-    @staticmethod
-    def parse_score(score_str: str) -> tuple:
-        """Parse score string into home and away scores"""
-        if not score_str:
-            return None, None
-        try:
-            home, away = re.split(r"[-–:]", score_str.strip())
-            return int(home), int(away)
-        except (ValueError, AttributeError):
-            return None, None
-
-    @staticmethod
-    def parse_attendance(attendance_str: str) -> int:
-        """Convert attendance string to integer"""
-        if not attendance_str:
-            return None
-        try:
-            return int(re.sub(r"[^\d]", "", attendance_str))
-        except ValueError:
-            return None
-
-    @staticmethod
-    def parse_team_stats(team_stats_str: str) -> dict:
-        """Robust team stats parser that handles malformed data"""
-        if not team_stats_str or team_stats_str.strip() in ("", "null"):
-            return {}
-
-        result = {}
-
-        # Extract possession
-        poss_match = re.search(
-            r"'Possession':\s*{'home':\s*'(\d+)%',\s*'away':\s*'(\d+)%'}",
-            team_stats_str,
-        )
-        if poss_match:
-            result.update(
-                {
-                    "home_possession": float(poss_match.group(1)),
-                    "away_possession": float(poss_match.group(2)),
-                }
-            )
-
-        # Extract passing accuracy
-        pass_match = re.search(
-            r"'Passing Accuracy':\s*{'home':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*',\s*'away':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*'}",
-            team_stats_str,
-        )
-        if pass_match:
-            result.update(
-                {
-                    "home_passes_completed": int(pass_match.group(1)),
-                    "home_passes_attempted": int(pass_match.group(2)),
-                    "away_passes_completed": int(pass_match.group(3)),
-                    "away_passes_attempted": int(pass_match.group(4)),
-                }
-            )
-
-        # Extract shots on target
-        shots_match = re.search(
-            r"'Shots on Target':\s*{'home':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*',\s*'away':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*'}",
-            team_stats_str,
-        )
-        if shots_match:
-            result.update(
-                {
-                    "home_shots_on_target": int(shots_match.group(1)),
-                    "home_shots_attempted": int(shots_match.group(2)),
-                    "away_shots_on_target": int(shots_match.group(3)),
-                    "away_shots_attempted": int(shots_match.group(4)),
-                }
-            )
-
-        # Extract saves
-        saves_match = re.search(
-            r"'Saves':\s*{'home':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*',\s*'away':\s*'[^']*?(\d+)\s*of\s*(\d+)[^']*'}",
-            team_stats_str,
-        )
-        if saves_match:
-            result.update(
-                {
-                    "home_saves_made": int(saves_match.group(1)),
-                    "home_saves_attempted": int(saves_match.group(2)),
-                    "away_saves_made": int(saves_match.group(3)),
-                    "away_saves_attempted": int(saves_match.group(4)),
-                }
-            )
-
-        return result
-
-    @staticmethod
-    def parse_extra_stats(extra_stats_str: str) -> dict:
-        """Parse pipe-delimited extra stats with better error handling"""
-        if not extra_stats_str or extra_stats_str.strip() in ("", "N/A"):
-            return {}
-
-        try:
-            # Clean and split the string
-            parts = [p.strip() for p in extra_stats_str.split("|") if p.strip()]
-
-            # The format alternates between value and stat name
-            stats = {}
-            i = 0
-            while i < len(parts) - 1:
-                try:
-                    # Current part should be a number (home value)
-                    home_val = int(parts[i])
-                    # Next part is the stat name
-                    stat_name = parts[i + 1].lower().replace(" ", "_")
-                    # Part after that is away value (if exists)
-                    away_val = int(parts[i + 2]) if i + 2 < len(parts) else 0
-
-                    stats.update(
-                        {f"home_{stat_name}": home_val, f"away_{stat_name}": away_val}
-                    )
-                    i += 3  # Move to next stat group
-                except (ValueError, IndexError):
-                    # If parsing fails, skip to next potential stat group
-                    i += 1
-
-            return stats
-        except Exception as e:
-            logger.error(f"Error parsing extra stats: {str(e)}")
-            return {}
-
-    def transform_match(self, raw_match: dict) -> Optional[dict]:
-        """Transform raw match data into structured format"""
-        try:
-            # Basic info
-            home_score, away_score = self.parse_score(raw_match.get("score", ""))
-            attendance = self.parse_attendance(raw_match.get("attendance", ""))
-
-            # Stats
-            team_stats = self.parse_team_stats(raw_match.get("team_stats", ""))
-            extra_stats = self.parse_extra_stats(raw_match.get("extra_stats", ""))
-
-            return {
-                "date": raw_match.get("date"),
-                "home_team": raw_match.get("home"),
-                "away_team": raw_match.get("away"),
-                "home_score": home_score,
-                "away_score": away_score,
-                "attendance": attendance,
-                "report_link": raw_match.get("report_link"),
-                **team_stats,
-                **extra_stats,
-                "date_added": raw_match.get("date_added"),
-                "data_source": raw_match.get("data_source"),
-                "load_id": raw_match.get("load_id"),
-                "checksum": raw_match.get("checksum"),
-                "version": raw_match.get("version"),
-                "last_updated": raw_match.get("last_updated"),
-            }
-        except Exception as e:
-            logger.error(f"Error transforming match: {str(e)}")
-            return None
-
-    def transform_all_matches(self, year: Optional[str] = None):
-        """Transform only new matches from raw table that don't exist in transformed table
-
-        Args:
-            year: Optional filter to only process matches from specific year (YYYY format)
+    def _raw_match_generator(self):
+        """Generate raw match data from database"""
+        raw_matches = self.db.execute_query(
+            f"""
+            SELECT * FROM {RAW_TABLE}
+            WHERE date IS NOT NULL
+            AND home IS NOT NULL
+            AND away IS NOT NULL
+            AND score IS NOT NULL
+            AND report_link IS NOT NULL
+            AND team_stats IS NOT NULL
+            AND extra_stats IS NOT NULL
         """
-        logger.info("Starting transformation of new matches")
-        logger.info(f"Year filter: {year if year else 'None'}")
-
-        with self.db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-
-            # First get all existing report links from transformed table
-            cursor.execute(f"SELECT report_link FROM {TRANSFORMED_TABLE}")
-            existing_links = {row[0] for row in cursor.fetchall()}
-
-            # Build query for raw table
-            query = f"SELECT * FROM {RAW_TABLE}"
-            conditions = []
-
-            # Filter out already processed matches
-            if existing_links:
-                # Create NOT IN clause with all existing links
-                placeholders = ",".join(["?"] * len(existing_links))
-                conditions.append(f"report_link NOT IN ({placeholders})")
-
-            # Add year filter if specified
-            if year:
-                conditions.append(f"date LIKE '{year}%'")
-
-            # Combine conditions
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-
-            # Execute with parameters if needed
-            if existing_links:
-                cursor.execute(query, tuple(existing_links))
-            else:
-                cursor.execute(query)
-
-            new_matches = [dict(row) for row in cursor.fetchall()]
-
-        total_new = len(new_matches)
-        if not total_new:
-            logger.info("No new matches found to transform")
-            return 0
-
-        logger.info(f"Found {total_new} new matches to transform")
-
-        success = 0
-        for index, match in enumerate(new_matches, 1):
-            transformed = self.transform_match(match)
-            if transformed:
-                self.save_transformed_match(transformed)
-                success += 1
-
-            # Log progress every 50 matches or at end
-            if index % 50 == 0 or index == total_new:
-                logger.info(
-                    f"Progress: {index}/{total_new} new matches transformed "
-                    f"({success} successful)"
-                )
-
-        logger.info(
-            f"Finished. Successfully processed {success}/{total_new} new matches"
         )
-        return success
-
-    def save_transformed_match(self, transformed: dict):
-        """Save transformed match to database"""
-        if not transformed:
-            return
-
-        columns = [
-            "date",
-            "home_team",
-            "away_team",
-            "home_score",
-            "away_score",
-            "attendance",
-            "report_link",
-            "home_possession",
-            "away_possession",
-            "home_passes_completed",
-            "home_passes_attempted",
-            "away_passes_completed",
-            "away_passes_attempted",
-            "home_shots_on_target",
-            "home_shots_attempted",
-            "away_shots_on_target",
-            "away_shots_attempted",
-            "home_saves_made",
-            "home_saves_attempted",
-            "away_saves_made",
-            "away_saves_attempted",
-            "home_fouls",
-            "away_fouls",
-            "home_corners",
-            "away_corners",
-            "home_crosses",
-            "away_crosses",
-            "home_touches",
-            "away_touches",
-            "home_tackles",
-            "away_tackles",
-            "home_interceptions",
-            "away_interceptions",
-            "home_aerials_won",
-            "away_aerials_won",
-            "home_clearances",
-            "away_clearances",
-            "home_offsides",
-            "away_offsides",
-            "home_goal_kicks",
-            "away_goal_kicks",
-            "home_throw_ins",
-            "away_throw_ins",
-            "home_long_balls",
-            "away_long_balls",
-            "date_added",
-            "data_source",
-            "load_id",
-            "checksum",
-            "version",
-            "last_updated",
-        ]
-
-        values = [transformed.get(col) for col in columns]
-
-        with self.db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                INSERT OR REPLACE INTO {TRANSFORMED_TABLE} ({",".join(columns)})
-                VALUES ({",".join(["?"]*len(columns))})
-                """,
-                values,
-            )
-            conn.commit()
-
-    def test_transform_10_rows(self):
-        """Test transformation with 10 sample rows"""
-        logger.info("Starting test transformation of 10 rows")
-
-        with self.db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {RAW_TABLE} LIMIT 10")
-            raw_matches = [dict(row) for row in cursor.fetchall()]
-
-        success = 0
         for match in raw_matches:
-            transformed = self.transform_match(match)
-            if transformed:
-                self.save_transformed_match(transformed)
-                logger.info(
-                    f"Transformed: {transformed['home_team']} {transformed['home_score']}-"
-                    f"{transformed['away_score']} {transformed['away_team']}"
-                )
-                success += 1
+            yield match
 
-        logger.info(f"Test complete. Success: {success}/{len(raw_matches)}")
-        return success
+    def _extract_basic_match_data(self, raw_match) -> Match:
+        """Extract basic match data from raw table"""
+        date = raw_match["date"]
+        home = raw_match["home"]
+        home_score = int(raw_match["score"].split("–")[0].strip())
+        away_score = int(raw_match["score"].split("–")[1].strip())
+        away = raw_match["away"]
+        report_link = raw_match["report_link"]
+        attendance = raw_match["attendance"]
+        return Match(date, home, home_score, away_score, away, report_link, attendance)
+
+    # TODO: implement team stats
+    def _extract_team_stats_data(self, raw_match) -> dict:
+        """Extract team stats data from raw table"""
+        return {}
+
+    # TODO: implement extra stats
+    def _extract_extra_stats_data(self, raw_match) -> dict:
+        return {}
+
+    def _save_transformed_data(self, match) -> None:
+        """Save transformed match data to database"""
+        self.db.execute_query(
+            f"""
+            INSERT INTO {TRANSFORMED_TABLE} (date, home, home_score, away_score, away, report_link, attendance, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (report_link) DO UPDATE SET
+                date = excluded.date,
+                home = excluded.home,
+                away = excluded.away,
+                home_score = excluded.home_score,
+                away_score = excluded.away_score,
+                report_link = excluded.report_link,
+                attendance = excluded.attendance,
+                last_updated = CURRENT_TIMESTAMP
+            """,
+            (
+                match.date,
+                match.home,
+                match.home_score,
+                match.away_score,
+                match.away,
+                match.report_link,
+                match.attendance,
+                match.last_updated,
+            ),
+        )
+
+    def transform(self) -> None:
+        """Transform raw match data into transformed match data"""
+        for i, raw_match in enumerate(self._raw_match_generator()):
+            match = self._extract_basic_match_data(raw_match)
+            team_stats = self._extract_team_stats_data(raw_match)
+            extra_stats = self._extract_extra_stats_data(raw_match)
+            match.update_stats(team_stats, extra_stats)
+            self._save_transformed_data(match)
+            if i >= 0:
+                break
 
 
 if __name__ == "__main__":
     transformer = DataTransformer()
-
-    # Run either test or full transformation
-    # transformer.test_transform_10_rows()
-    transformer.transform_all_matches()
+    transformer.transform()
