@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import re
+import sqlite3
 
 from bs4 import BeautifulSoup
 from database import DatabaseManager
@@ -97,7 +98,7 @@ class DataTransformer:
         for match in raw_matches:
             yield match
 
-    def _extract_basic_match_data(self, raw_match) -> Match:
+    def _extract_basic_match_data(self, raw_match: sqlite3.Row) -> Match:
         """Extract basic match data from raw table"""
         date = raw_match["date"]
         home = raw_match["home"]
@@ -108,7 +109,7 @@ class DataTransformer:
         attendance = raw_match["attendance"]
         return Match(date, home, home_score, away_score, away, report_link, attendance)
 
-    def _extract_team_stats_data(self, raw_match) -> dict:
+    def _extract_team_stats_data(self, raw_match: sqlite3.Row) -> dict:
         """Extract team stats data from raw table"""
         soup = BeautifulSoup(raw_match["team_stats"], "html.parser")
         team_stats = {
@@ -119,7 +120,7 @@ class DataTransformer:
         }
         return team_stats
 
-    def _extract_absolute_team_stats(self, soup, category, label):
+    def _extract_absolute_team_stats(self, soup, category, label) -> dict:
         """Extract absolute values from team stats"""
         category_dict = {}
         category_data = soup.select(
@@ -142,8 +143,8 @@ class DataTransformer:
 
         return category_dict
 
-    def _extract_percentage_from_team_stats(self, soup, category):
-        """Extract possession data from team stats"""
+    def _extract_percentage_from_team_stats(self, soup, category) -> dict:
+        """Extract percentage data from team stats"""
         possession_dict = {}
         possession_data = soup.select(
             f'div#team_stats tr:has(th:-soup-contains("{category}")) + tr'
@@ -165,10 +166,38 @@ class DataTransformer:
         return possession_dict
 
     # TODO: implement extra stats
-    def _extract_extra_stats_data(self, raw_match) -> dict:
+    def _extract_extra_stats_data(self, raw_match: sqlite3.Row) -> dict:
+        """Extract extra stats data from raw table"""
+        column_map = {
+            "Fouls": ("home_fouls", "away_fouls"),
+            "Corners": ("home_corners", "away_corners"),
+            "Crosses": ("home_crosses", "away_crosses"),
+            "Touches": ("home_touches", "away_touches"),
+            "Tackles": ("home_tackles", "away_tackles"),
+            "Interceptions": ("home_interceptions", "away_interceptions"),
+            "Aerials Won": ("home_aerials_won", "away_aerials_won"),
+            "Clearances": ("home_clearances", "away_clearances"),
+            "Offsides": ("home_offsides", "away_offsides"),
+            "Goal Kicks": ("home_goal_kicks", "away_goal_kicks"),
+            "Throw Ins": ("home_throw_ins", "away_throw_ins"),
+            "Long Balls": ("home_long_balls", "away_long_balls"),
+        }
+
+        def clean_item(div):
+            text = div.get_text().strip().lower().replace(" ", "_")
+            return text
+
+        soup = BeautifulSoup(raw_match["extra_stats"], "html.parser")
+        data_divs = soup.select("div#team_stats_extra > div > div:not([class])")
+        home_data = [clean_item(div) for div in data_divs[::3]]
+        stat_name = [clean_item(div) for div in data_divs[1::3]]
+        away_data = [clean_item(div) for div in data_divs[2::3]]
+        print(home_data)
+        print(stat_name)
+        print(away_data)
         return {}
 
-    def _save_transformed_data(self, match) -> None:
+    def _save_transformed_data(self, match: Match) -> None:
         """Save transformed match data to database"""
         self.db.execute_query(
             f"""
@@ -200,13 +229,14 @@ class DataTransformer:
         """Transform raw match data into transformed match data"""
         for i, raw_match in enumerate(self._raw_match_generator()):
             match = self._extract_basic_match_data(raw_match)
-            team_stats = self._extract_team_stats_data(raw_match)
-            # extra_stats = self._extract_extra_stats_data(raw_match)
+            # team_stats = self._extract_team_stats_data(raw_match)
+            extra_stats = self._extract_extra_stats_data(raw_match)
+            print(extra_stats)
             # if team_stats and extra_stats:
             #     match.update_stats(team_stats, extra_stats)
 
             # self._save_transformed_data(match)
-            if i >= 30:
+            if i >= 0:
                 break
 
 
