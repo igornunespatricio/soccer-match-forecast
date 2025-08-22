@@ -41,12 +41,12 @@ class SerieAScraper:
             for i, row in enumerate(rows):
                 if match := self._extract_match_data(row):
                     self.db.execute_query(
-                        "INSERT INTO raw_matches (date, home, score, away, attendance, report_link) "
+                        "INSERT INTO raw_matches (date, home, score, away, attendance, report_link, last_updated) "
                         "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
                         "ON CONFLICT(date, home, away) DO UPDATE SET "
                         "score = COALESCE(score, excluded.score), "
                         "report_link = COALESCE(report_link, excluded.report_link), "
-                        "attendance = excluded.attendance "
+                        "attendance = excluded.attendance, "
                         "last_updated = CURRENT_TIMESTAMP "
                         "WHERE score IS NULL OR report_link IS NULL",
                         (
@@ -162,8 +162,8 @@ if __name__ == "__main__":
 
     try:
         scraper = SerieAScraper(driver)
-        scraper.scrape_basic_match_data(url=URLS[0])
-        scraper.scrape_match_reports(year=2025)
+        # scraper.scrape_basic_match_data(url=URLS[0])
+        scraper.scrape_match_reports()
 
     finally:
         driver_manager.close()
