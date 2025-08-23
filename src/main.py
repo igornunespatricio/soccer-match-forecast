@@ -4,7 +4,7 @@ from config import URLS
 from webdriver import ChromeDriverWrapper
 
 
-def main():
+def main(scrape_basic_match_data: bool = True, scrape_match_reports: bool = True):
     # Initialize database
     db = DatabaseManager()
     db.initialize_db()
@@ -12,16 +12,20 @@ def main():
     # Initialize driver
     driver_manager = ChromeDriverWrapper(headless=True)
     driver = driver_manager.get_driver()
-    try:
-        for url in URLS:
 
-            # Scrape
-            scraper = SerieAScraper(driver)
-            # scraper.scrape_basic_match_data(url=url)
-            # scraper.scrape_match_reports()
-    finally:
-        driver_manager.close()
+    # Scrape basic match data
+    scraper = SerieAScraper(driver)
+    if scrape_basic_match_data:
+        for url in URLS:
+            scraper.scrape_basic_match_data(url=url)
+
+    # Scrape match reports
+    if scrape_match_reports:
+        scraper.scrape_match_reports()
+
+    # Close driver
+    driver_manager.close()
 
 
 if __name__ == "__main__":
-    main()
+    main(scrape_basic_match_data=False, scrape_match_reports=True)

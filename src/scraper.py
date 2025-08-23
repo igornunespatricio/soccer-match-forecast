@@ -10,7 +10,7 @@ from webdriver import ChromeDriverWrapper
 from logger import get_logger
 from config import REQUEST_DELAY, URLS, RAW_TABLE
 
-logger = get_logger("SerieAScraper")
+logger = get_logger("SerieAScraper")  # TODO: add scraper logger path
 
 
 @dataclass
@@ -137,7 +137,7 @@ class SerieAScraper:
             if year:
                 query += f" AND date LIKE '{year}%'"
             matches = self.db.execute_query(query)
-            logger.info(f"Found {len(matches)} matches to scrape")
+            logger.info(f"Found {len(matches)} match reports to scrape")
             for i, match in enumerate(matches):
                 soup = self._get_page(match["report_link"])
                 team_stats = self._extract_team_stats(soup)
@@ -162,8 +162,8 @@ if __name__ == "__main__":
 
     try:
         scraper = SerieAScraper(driver)
-        # scraper.scrape_basic_match_data(url=URLS[0])
-        scraper.scrape_match_reports()
+        scraper.scrape_basic_match_data(url=URLS[0])
+        # scraper.scrape_match_reports()
 
     finally:
         driver_manager.close()

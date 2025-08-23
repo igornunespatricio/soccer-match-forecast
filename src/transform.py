@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
 
-logger = get_logger("Transformer")
+logger = get_logger("Transformer")  # TODO: add transformer logger path
 
 
 @dataclass
