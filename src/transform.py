@@ -4,7 +4,7 @@ import sqlite3
 
 from bs4 import BeautifulSoup
 from database import DatabaseManager
-from config import RAW_TABLE, TRANSFORMED_TABLE
+from config import RAW_TABLE, TRANSFORMED_TABLE, TRANSFORMED_COLUMNS, COLUMN_MAP
 from logger import get_logger
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -70,11 +70,15 @@ class Match:
     date_added: Optional[datetime] = field(default_factory=datetime.now)
     last_updated: Optional[datetime] = field(default_factory=datetime.now)
 
-    def update_stats(self, team_stats: dict, extra_stats: dict):
-        """Update the match instance with team and extra stats"""
-        for key, value in {**team_stats, **extra_stats}.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+    def update_stats(self, *stat_dics):
+        """Update the match data with new stats"""
+        try:
+            for stat_dic in stat_dics:
+                for key, value in stat_dic.items():
+                    if hasattr(self, key):
+                        setattr(self, key, value)
+        except Exception as e:
+            logger.error(f"Error while updating match stats: {e}")
 
 
 class DataTransformer:
@@ -82,162 +86,190 @@ class DataTransformer:
         self.db = DatabaseManager()
 
     def _raw_match_generator(self):
-        """Generate raw match data from database"""
-        raw_matches = self.db.execute_query(
-            f"""
-            SELECT * FROM {RAW_TABLE}
-            WHERE date IS NOT NULL
-            AND home IS NOT NULL
-            AND away IS NOT NULL
-            AND score IS NOT NULL
-            AND report_link IS NOT NULL
-            AND team_stats IS NOT NULL
-            AND extra_stats IS NOT NULL
-        """
-        )
-        for match in raw_matches:
-            yield match
+        """Generator method for raw match data"""
+        try:
+            raw_matches = self.db.execute_query(
+                f"""
+                SELECT * FROM {RAW_TABLE}
+                WHERE 
+                report_link NOT IN (SELECT report_link FROM {TRANSFORMED_TABLE})
+                AND date IS NOT NULL
+                AND home IS NOT NULL
+                AND away IS NOT NULL
+                AND score IS NOT NULL
+                AND report_link IS NOT NULL
+                AND team_stats IS NOT NULL
+                AND extra_stats IS NOT NULL
+            """
+            )
+            for match in raw_matches:
+                yield match
+        except Exception as e:
+            logger.error(f"Error while generating raw match data: {e}")
 
     def _extract_basic_match_data(self, raw_match: sqlite3.Row) -> Match:
         """Extract basic match data from raw table"""
-        date = raw_match["date"]
-        home = raw_match["home"]
-        home_score = int(raw_match["score"].split("–")[0].strip())
-        away_score = int(raw_match["score"].split("–")[1].strip())
-        away = raw_match["away"]
-        report_link = raw_match["report_link"]
-        attendance = raw_match["attendance"]
-        return Match(date, home, home_score, away_score, away, report_link, attendance)
+        try:
+            date = raw_match["date"]
+            home = raw_match["home"]
+            home_score = int(raw_match["score"].split("–")[0].strip())
+            away_score = int(raw_match["score"].split("–")[1].strip())
+            away = raw_match["away"]
+            report_link = raw_match["report_link"]
+            attendance = raw_match["attendance"]
+            return Match(
+                date, home, home_score, away_score, away, report_link, attendance
+            )
+        except Exception as e:
+            logger.error(f"Error while extracting basic match data: {e}")
+            return Match
 
     def _extract_team_stats_data(self, raw_match: sqlite3.Row) -> dict:
         """Extract team stats data from raw table"""
-        soup = BeautifulSoup(raw_match["team_stats"], "html.parser")
-        team_stats = {
-            **self._extract_percentage_from_team_stats(soup, "Possession"),
-            **self._extract_absolute_team_stats(soup, "Passing Accuracy", "passes"),
-            **self._extract_absolute_team_stats(soup, "Shots on Target", "shots"),
-            **self._extract_absolute_team_stats(soup, "Saves", "saves"),
-        }
-        return team_stats
+        try:
+
+            soup = BeautifulSoup(raw_match["team_stats"], "html.parser")
+            team_stats = {
+                **self._extract_percentage_from_team_stats(
+                    soup, "Possession", "possession"
+                ),
+                **self._extract_absolute_team_stats(soup, "Passing Accuracy", "passes"),
+                **self._extract_absolute_team_stats(soup, "Shots on Target", "shots"),
+                **self._extract_absolute_team_stats(soup, "Saves", "saves"),
+            }
+            return team_stats
+
+        except Exception as e:
+            logger.error(f"Error while extracting team stats data: {e}")
+            return {}
 
     def _extract_absolute_team_stats(self, soup, category, label) -> dict:
         """Extract absolute values from team stats"""
         category_dict = {}
-        category_data = soup.select(
-            f'div#team_stats tr:has(th:-soup-contains("{category}")) + tr'
-        )
-        if category_data:
-            data_row = category_data[0]
-            home_text = data_row.select_one("td:first-child").get_text()
-            away_text = data_row.select_one("td:last-child").get_text()
+        try:
+            category_data = soup.select(
+                f'div#team_stats tr:has(th:-soup-contains("{category}")) + tr'
+            )
+            if category_data:
+                data_row = category_data[0]
+                home_text = data_row.select_one("td:first-child").get_text()
+                away_text = data_row.select_one("td:last-child").get_text()
 
-            home_match = re.search(r"(\d+)\s+of\s+(\d+)", home_text)
-            away_match = re.search(r"(\d+)\s+of\s+(\d+)", away_text)
+                home_match = re.search(r"(\d+)\s+of\s+(\d+)", home_text)
+                away_match = re.search(r"(\d+)\s+of\s+(\d+)", away_text)
 
-            if home_match:
-                category_dict[f"home_{label}_completed"] = int(home_match.group(1))
-                category_dict[f"home_{label}_attempts"] = int(home_match.group(2))
-            if away_match:
-                category_dict[f"away_{label}_completed"] = int(away_match.group(1))
-                category_dict[f"away_{label}_attempts"] = int(away_match.group(2))
+                if home_match:
+                    category_dict[f"home_{label}_completed"] = int(home_match.group(1))
+                    category_dict[f"home_{label}_attempts"] = int(home_match.group(2))
+                if away_match:
+                    category_dict[f"away_{label}_completed"] = int(away_match.group(1))
+                    category_dict[f"away_{label}_attempts"] = int(away_match.group(2))
 
-        return category_dict
+            return category_dict
+        except Exception as e:
+            logger.error(f"Error while extracting {label} data: {e}")
+            return {}
 
-    def _extract_percentage_from_team_stats(self, soup, category) -> dict:
+    def _extract_percentage_from_team_stats(self, soup, category, label) -> dict:
         """Extract percentage data from team stats"""
-        possession_dict = {}
-        possession_data = soup.select(
-            f'div#team_stats tr:has(th:-soup-contains("{category}")) + tr'
-        )
-        if possession_data:
-            data_row = possession_data[0]
-            home_percent = data_row.select_one("td:first-child strong")
-            away_percent = data_row.select_one("td:last-child strong")
-            if home_percent and away_percent:
-                try:
-                    possession_dict["home_possession"] = float(
-                        home_percent.get_text(strip=True).replace("%", "")
-                    )
-                    possession_dict["away_possession"] = float(
-                        away_percent.get_text(strip=True).replace("%", "")
-                    )
-                except ValueError:
-                    pass
-        return possession_dict
+        try:
+            percentage_dict = {}
+            percentage_data = soup.select(
+                f'div#team_stats tr:has(th:-soup-contains("{category}")) + tr'
+            )
+            if percentage_data:
+                data_row = percentage_data[0]
+                home_percent = data_row.select_one("td:first-child strong")
+                away_percent = data_row.select_one("td:last-child strong")
+                if home_percent and away_percent:
+                    try:
+                        percentage_dict[f"home_{label}"] = float(
+                            home_percent.get_text(strip=True).replace("%", "")
+                        )
+                        percentage_dict[f"away_{label}"] = float(
+                            away_percent.get_text(strip=True).replace("%", "")
+                        )
+                    except ValueError:
+                        pass
+            return percentage_dict
+        except Exception as e:
+            logger.error(f"Error while extracting {category} data: {e}")
+            return {}
 
-    # TODO: implement extra stats
     def _extract_extra_stats_data(self, raw_match: sqlite3.Row) -> dict:
         """Extract extra stats data from raw table"""
-        column_map = {
-            "Fouls": ("home_fouls", "away_fouls"),
-            "Corners": ("home_corners", "away_corners"),
-            "Crosses": ("home_crosses", "away_crosses"),
-            "Touches": ("home_touches", "away_touches"),
-            "Tackles": ("home_tackles", "away_tackles"),
-            "Interceptions": ("home_interceptions", "away_interceptions"),
-            "Aerials Won": ("home_aerials_won", "away_aerials_won"),
-            "Clearances": ("home_clearances", "away_clearances"),
-            "Offsides": ("home_offsides", "away_offsides"),
-            "Goal Kicks": ("home_goal_kicks", "away_goal_kicks"),
-            "Throw Ins": ("home_throw_ins", "away_throw_ins"),
-            "Long Balls": ("home_long_balls", "away_long_balls"),
-        }
 
         def clean_item(div):
-            text = div.get_text().strip().lower().replace(" ", "_")
+            text = div.get_text().strip()
             return text
 
-        soup = BeautifulSoup(raw_match["extra_stats"], "html.parser")
-        data_divs = soup.select("div#team_stats_extra > div > div:not([class])")
-        home_data = [clean_item(div) for div in data_divs[::3]]
-        stat_name = [clean_item(div) for div in data_divs[1::3]]
-        away_data = [clean_item(div) for div in data_divs[2::3]]
-        print(home_data)
-        print(stat_name)
-        print(away_data)
-        return {}
+        try:
+
+            extra_stats = {}
+            soup = BeautifulSoup(raw_match["extra_stats"], "html.parser")
+            data_divs = soup.select("div#team_stats_extra > div > div:not([class])")
+            home_data = [clean_item(div) for div in data_divs[::3]]
+            stat_names = [clean_item(div) for div in data_divs[1::3]]
+            away_data = [clean_item(div) for div in data_divs[2::3]]
+            for i, stat_name in enumerate(stat_names):
+                if stat_name in COLUMN_MAP:
+                    extra_stats[COLUMN_MAP[stat_name][0]] = int(home_data[i])
+                    extra_stats[COLUMN_MAP[stat_name][1]] = int(away_data[i])
+            return extra_stats
+
+        except Exception as e:
+            logger.error(f"Error while extracting extra stats data: {e}")
+            return {}
 
     def _save_transformed_data(self, match: Match) -> None:
         """Save transformed match data to database"""
-        self.db.execute_query(
-            f"""
-            INSERT INTO {TRANSFORMED_TABLE} (date, home, home_score, away_score, away, report_link, attendance, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (report_link) DO UPDATE SET
-                date = excluded.date,
-                home = excluded.home,
-                away = excluded.away,
-                home_score = excluded.home_score,
-                away_score = excluded.away_score,
-                report_link = excluded.report_link,
-                attendance = excluded.attendance,
-                last_updated = CURRENT_TIMESTAMP
-            """,
-            (
-                match.date,
-                match.home,
-                match.home_score,
-                match.away_score,
-                match.away,
-                match.report_link,
-                match.attendance,
-                match.last_updated,
-            ),
-        )
+        try:
+            columns = ", ".join(TRANSFORMED_COLUMNS)
+            placeholders = ", ".join(["?"] * len(TRANSFORMED_COLUMNS))
+            update_clause = ", ".join(
+                [
+                    f"{column} = excluded.{column}"
+                    for column in TRANSFORMED_COLUMNS
+                    if column != "report_link"
+                ]
+            )
+            query = f"""
+                INSERT INTO {TRANSFORMED_TABLE} ({columns})
+                VALUES ({placeholders})
+                ON CONFLICT (report_link) DO UPDATE SET
+                    {update_clause},
+                    last_updated = CURRENT_TIMESTAMP
+            """
+            self.db.execute_query(
+                query,
+                tuple(getattr(match, column) for column in TRANSFORMED_COLUMNS),
+            )
+
+        except Exception as e:
+            logger.error(f"Error while saving transformed data: {e}")
 
     def transform(self) -> None:
         """Transform raw match data into transformed match data"""
-        for i, raw_match in enumerate(self._raw_match_generator()):
-            match = self._extract_basic_match_data(raw_match)
-            # team_stats = self._extract_team_stats_data(raw_match)
-            extra_stats = self._extract_extra_stats_data(raw_match)
-            print(extra_stats)
-            # if team_stats and extra_stats:
-            #     match.update_stats(team_stats, extra_stats)
-
-            # self._save_transformed_data(match)
-            if i >= 0:
-                break
+        try:
+            raw_matches = self._raw_match_generator()
+            logger.info(f"Transforming matches...")
+            for i, raw_match in enumerate(raw_matches):
+                try:
+                    match = self._extract_basic_match_data(raw_match)
+                    team_stats = self._extract_team_stats_data(raw_match)
+                    extra_stats = self._extract_extra_stats_data(raw_match)
+                    match.update_stats(team_stats, extra_stats)
+                    self._save_transformed_data(match)
+                    logger.info(
+                        f"Transformed match {i+1} - {match.home} {match.home_score} x {match.away_score} {match.away} - {match.report_link}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error while transforming match {match.report_link}: {e}"
+                    )
+            logger.info(f"Transformation completed!")
+        except Exception as e:
+            logger.error(f"Error in transformation process: {e}")
 
 
 if __name__ == "__main__":
