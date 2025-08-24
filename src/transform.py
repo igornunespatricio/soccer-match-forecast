@@ -84,13 +84,8 @@ class Match:
 class DataTransformer:
     def __init__(self):
         self.db = DatabaseManager()
-
-    def _raw_match_generator(self):
-        """Generator method for raw match data"""
-        try:
-            raw_matches = self.db.execute_query(
-                f"""
-                SELECT * FROM {RAW_TABLE}
+        self.table_filter = f"""
+                FROM {RAW_TABLE}
                 WHERE 
                 report_link NOT IN (SELECT report_link FROM {TRANSFORMED_TABLE})
                 AND date IS NOT NULL
@@ -101,7 +96,11 @@ class DataTransformer:
                 AND team_stats IS NOT NULL
                 AND extra_stats IS NOT NULL
             """
-            )
+
+    def _raw_match_generator(self):
+        """Generator method for raw match data"""
+        try:
+            raw_matches = self.db.execute_query(f"SELECT * {self.table_filter}")
             for match in raw_matches:
                 yield match
         except Exception as e:
@@ -248,11 +247,20 @@ class DataTransformer:
         except Exception as e:
             logger.error(f"Error while saving transformed data: {e}")
 
+    def _count_matches_to_transform(self) -> int:
+        """Count the number of matches to transform"""
+        try:
+            return self.db.execute_query(f"SELECT COUNT(*) {self.table_filter}")[0][0]
+        except Exception as e:
+            logger.error(f"Error while counting matches to transform: {e}")
+            return 0
+
     def transform(self) -> None:
         """Transform raw match data into transformed match data"""
         try:
+            total_matches_transform = self._count_matches_to_transform()
             raw_matches = self._raw_match_generator()
-            logger.info(f"Transforming matches...")
+            logger.info(f"Transforming {total_matches_transform} matches...")
             for i, raw_match in enumerate(raw_matches):
                 try:
                     match = self._extract_basic_match_data(raw_match)
@@ -261,7 +269,7 @@ class DataTransformer:
                     match.update_stats(team_stats, extra_stats)
                     self._save_transformed_data(match)
                     logger.info(
-                        f"Transformed match {i+1} - {match.home} {match.home_score} x {match.away_score} {match.away} - {match.report_link}"
+                        f"Transformed match {i+1}/{total_matches_transform} - {match.home} {match.home_score} x {match.away_score} {match.away} - {match.report_link}"
                     )
                 except Exception as e:
                     logger.error(
