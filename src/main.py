@@ -2,9 +2,14 @@ from database import DatabaseManager
 from scraper import SerieAScraper
 from config import URLS
 from webdriver import ChromeDriverWrapper
+from transform import DataTransformer
 
 
-def main(scrape_basic_match_data: bool = True, scrape_match_reports: bool = True):
+def main(
+    scrape_basic_match_data: bool = True,
+    scrape_match_reports: bool = True,
+    transform_data: bool = True,
+):
     # Initialize database
     db = DatabaseManager()
     db.initialize_db()
@@ -28,6 +33,10 @@ def main(scrape_basic_match_data: bool = True, scrape_match_reports: bool = True
     if scrape_basic_match_data and scrape_match_reports:
         driver_manager.close()
 
+    if transform_data:
+        transformer = DataTransformer()
+        transformer.transform()
+
 
 if __name__ == "__main__":
-    main(scrape_basic_match_data=False, scrape_match_reports=False)
+    main()

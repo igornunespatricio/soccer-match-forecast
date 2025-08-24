@@ -5,7 +5,7 @@ from pathlib import Path
 # ==========================================================================
 DATABASE_PATH = Path(__file__).parent.parent / "data"
 SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
-
+TRANSFORMER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "transformer.log"
 # ==========================================================================
 # Web Scraper Configuration
 # ==========================================================================

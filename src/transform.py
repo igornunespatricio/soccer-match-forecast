@@ -4,13 +4,22 @@ import sqlite3
 
 from bs4 import BeautifulSoup
 from database import DatabaseManager
-from config import RAW_TABLE, TRANSFORMED_TABLE, TRANSFORMED_COLUMNS, COLUMN_MAP
+from config import (
+    RAW_TABLE,
+    TRANSFORMED_TABLE,
+    TRANSFORMED_COLUMNS,
+    COLUMN_MAP,
+    TRANSFORMER_LOGGER_PATH,
+)
 from logger import get_logger
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
 
-logger = get_logger("Transformer")  # TODO: add transformer logger path
+logger = get_logger(
+    "Transformer",
+    TRANSFORMER_LOGGER_PATH,
+)
 
 
 @dataclass
