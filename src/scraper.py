@@ -40,7 +40,6 @@ class SerieAScraper:
             logger.info(f"Found {len(rows)} matches to scrape")
             for i, row in enumerate(rows):
                 if match := self._extract_match_data(row):
-                    # TODO: only insert if match is not in database
                     self.db.execute_query(
                         "INSERT INTO raw_matches (date, home, score, away, attendance, report_link, last_updated) "
                         "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
@@ -59,6 +58,7 @@ class SerieAScraper:
                             match["report_link"],
                         ),
                     )
+                    # TODO: fix - only log if match is saved
                     logger.info(
                         f"Saved match {i+1}/{len(rows)}: {match['home']} {match['score']} {match['away']} to database - {match['report_link']}"
                     )
