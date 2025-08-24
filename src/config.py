@@ -107,3 +107,84 @@ COLUMN_MAP = {
     "Throw Ins": ("home_throw_ins", "away_throw_ins"),
     "Long Balls": ("home_long_balls", "away_long_balls"),
 }
+
+RAW_TABLE_QUERY = f"""
+                CREATE TABLE IF NOT EXISTS {RAW_TABLE} (
+                    -- Match data
+                    report_link TEXT UNIQUE,
+                    date TEXT NOT NULL,
+                    home TEXT NOT NULL,
+                    score TEXT,
+                    away TEXT NOT NULL,
+                    attendance TEXT,
+                    team_stats TEXT,
+                    extra_stats TEXT,
+                    
+                    -- Metadata
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                    PRIMARY KEY (date, home, away)  -- Composite primary key
+                )
+                """
+
+TRANSFOMED_TABLE_QUERY = f"""
+                CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
+                    -- Original match data
+                    date DATE NOT NULL,
+                    home TEXT NOT NULL,
+                    home_score INT NOT NULL,
+                    away_score INT NOT NULL,
+                    away TEXT NOT NULL,
+                    attendance INT,
+                    report_link TEXT NOT NULL UNIQUE,
+                    
+                    -- Transformed team stats
+                    home_possession REAL,
+                    away_possession REAL,
+                    home_passes_attempts INTEGER,
+                    home_passes_completed INTEGER,
+                    away_passes_attempts INTEGER,
+                    away_passes_completed INTEGER,
+                    home_shots_attempts INTEGER,
+                    home_shots_completed INTEGER,
+                    away_shots_attempts INTEGER,
+                    away_shots_completed INTEGER,
+                    home_saves_attempts INTEGER,
+                    home_saves_completed INTEGER,
+                    away_saves_attempts INTEGER,
+                    away_saves_completed INTEGER,
+                    
+                    -- Transformed extra stats
+                    home_fouls INTEGER,
+                    away_fouls INTEGER,
+                    home_corners INTEGER,
+                    away_corners INTEGER,
+                    home_crosses INTEGER,
+                    away_crosses INTEGER,
+                    home_touches INTEGER,
+                    away_touches INTEGER,
+                    home_tackles INTEGER,
+                    away_tackles INTEGER,
+                    home_interceptions INTEGER,
+                    away_interceptions INTEGER,
+                    home_aerials_won INTEGER,
+                    away_aerials_won INTEGER,
+                    home_clearances INTEGER,
+                    away_clearances INTEGER,
+                    home_offsides INTEGER,
+                    away_offsides INTEGER,
+                    home_goal_kicks INTEGER,
+                    away_goal_kicks INTEGER,
+                    home_throw_ins INTEGER,
+                    away_throw_ins INTEGER,
+                    home_long_balls INTEGER,
+                    away_long_balls INTEGER,
+                    
+                    -- Metadata
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    PRIMARY KEY (report_link)
+                )
+                """
