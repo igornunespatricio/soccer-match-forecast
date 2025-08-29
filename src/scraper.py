@@ -25,6 +25,7 @@ class Match:
     team_stats_extra: str
 
 
+# TODO: Adjust class name to generic soccer scraper
 class SerieAScraper:
     def __init__(self, driver: ChromeDriverWrapper):
         self.driver = driver

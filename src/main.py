@@ -15,22 +15,21 @@ def main(
     db.initialize_db()
 
     # Initialize driver
-    if scrape_basic_match_data and scrape_match_reports:
+    if scrape_basic_match_data or scrape_match_reports:
         driver_manager = ChromeDriverWrapper(headless=True)
         driver = driver_manager.get_driver()
 
-    # Scrape basic match data
-    scraper = SerieAScraper(driver)
-    if scrape_basic_match_data:
-        for url in URLS:
-            scraper.scrape_basic_match_data(url=url)
+        scraper = SerieAScraper(driver)
 
-    # Scrape match reports
-    if scrape_match_reports:
-        scraper.scrape_match_reports()
+        # Scrape basic match data
+        if scrape_basic_match_data:
+            for url in URLS:
+                scraper.scrape_basic_match_data(url=url)
 
-    # Close driver
-    if scrape_basic_match_data and scrape_match_reports:
+        # Scrape match reports
+        if scrape_match_reports:
+            scraper.scrape_match_reports()
+
         driver_manager.close()
 
     if transform_data:
@@ -39,4 +38,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main(scrape_basic_match_data=False, scrape_match_reports=False, transform_data=True)

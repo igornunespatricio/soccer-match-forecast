@@ -11,16 +11,28 @@ TRANSFORMER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "transformer.l
 # ==========================================================================
 # Define the URL of the page to scrape
 URLS = [
-    "https://fbref.com/en/comps/24/2025/schedule/2025-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2024/schedule/2024-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2023/schedule/2023-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2022/schedule/2022-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2021/schedule/2021-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2020/schedule/2020-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2019/schedule/2019-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2018/schedule/2018-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2017/schedule/2017-Serie-A-Scores-and-Fixtures",
-    "https://fbref.com/en/comps/24/2016/schedule/2016-Serie-A-Scores-and-Fixtures",
+    ### Serie-A - Brazil
+    # "https://fbref.com/en/comps/24/2025/schedule/2025-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2024/schedule/2024-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2023/schedule/2023-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2022/schedule/2022-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2021/schedule/2021-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2020/schedule/2020-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2019/schedule/2019-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2018/schedule/2018-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2017/schedule/2017-Serie-A-Scores-and-Fixtures",
+    # "https://fbref.com/en/comps/24/2016/schedule/2016-Serie-A-Scores-and-Fixtures",
+    ### La Liga - Spain
+    "https://fbref.com/en/comps/12/2016-2017/schedule/2016-2017-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2017-2018/schedule/2017-2018-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2018-2019/schedule/2018-2019-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2019-2020/schedule/2019-2020-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2020-2021/schedule/2020-2021-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2021-2022/schedule/2021-2022-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2022-2023/schedule/2022-2023-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2023-2024/schedule/2023-2024-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2024-2025/schedule/2024-2025-La-Liga-Scores-and-Fixtures",
+    "https://fbref.com/en/comps/12/2025-2026/schedule/2025-2026-La-Liga-Scores-and-Fixtures",
 ]
 
 # Define request delay and max retries for web requests
