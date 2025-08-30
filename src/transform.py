@@ -90,6 +90,7 @@ class Match:
             logger.error(f"Error while updating match stats: {e}")
 
 
+# TODO: add raw season link in transformed table
 class DataTransformer:
     def __init__(self):
         self.db = DatabaseManager()
