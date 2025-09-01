@@ -11,8 +11,8 @@ TRANSFORMER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "transformer.l
 # ==========================================================================
 # Define the URL of the page to scrape
 URLS = [
-    ### Serie-A - Brazil
-    # "https://fbref.com/en/comps/24/2025/schedule/2025-Serie-A-Scores-and-Fixtures",
+    # ### Serie-A - Brazil
+    "https://fbref.com/en/comps/24/2025/schedule/2025-Serie-A-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/24/2024/schedule/2024-Serie-A-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/24/2023/schedule/2023-Serie-A-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/24/2022/schedule/2022-Serie-A-Scores-and-Fixtures",
@@ -22,7 +22,7 @@ URLS = [
     # "https://fbref.com/en/comps/24/2018/schedule/2018-Serie-A-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/24/2017/schedule/2017-Serie-A-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/24/2016/schedule/2016-Serie-A-Scores-and-Fixtures",
-    ### La Liga - Spain
+    # ## La Liga - Spain
     # "https://fbref.com/en/comps/12/2016-2017/schedule/2016-2017-La-Liga-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/12/2017-2018/schedule/2017-2018-La-Liga-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/12/2018-2019/schedule/2018-2019-La-Liga-Scores-and-Fixtures",
@@ -33,7 +33,7 @@ URLS = [
     # "https://fbref.com/en/comps/12/2023-2024/schedule/2023-2024-La-Liga-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/12/2024-2025/schedule/2024-2025-La-Liga-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/12/2025-2026/schedule/2025-2026-La-Liga-Scores-and-Fixtures",
-    ### Premier League - England
+    # ## Premier League - England
     # "https://fbref.com/en/comps/9/2014-2015/schedule/2014-2015-Premier-League-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/9/2015-2016/schedule/2015-2016-Premier-League-Scores-and-Fixtures",
     # "https://fbref.com/en/comps/9/2016-2017/schedule/2016-2017-Premier-League-Scores-and-Fixtures",
@@ -137,6 +137,7 @@ COLUMN_MAP = {
 RAW_TABLE_QUERY = f"""
                 CREATE TABLE IF NOT EXISTS {RAW_TABLE} (
                     -- Match data
+                    season_link TEXT NOT NULL,
                     report_link TEXT UNIQUE,
                     date TEXT NOT NULL,
                     home TEXT NOT NULL,
@@ -150,13 +151,17 @@ RAW_TABLE_QUERY = f"""
                     date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-                    PRIMARY KEY (date, home, away)  -- Composite primary key
-                )
+                    PRIMARY KEY (season_link, home, away)  -- Composite primary key
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_report_link ON {RAW_TABLE}(report_link);
+                CREATE INDEX IF NOT EXISTS idx_match_composite ON {RAW_TABLE}(season_link, home, away);
                 """
 
 TRANSFOMED_TABLE_QUERY = f"""
                 CREATE TABLE IF NOT EXISTS {TRANSFORMED_TABLE} (
                     -- Original match data
+                    season_link TEXT NOT NULL,
                     date DATE NOT NULL,
                     home TEXT NOT NULL,
                     home_score INT NOT NULL,

@@ -15,6 +15,7 @@ logger = get_logger("SerieAScraper", SCRAPER_LOGGER_PATH)
 
 @dataclass
 class Match:
+    season_link: str
     date: str
     home: str
     score: str
@@ -31,6 +32,7 @@ class SerieAScraper:
     def __init__(self, driver: ChromeDriverWrapper):
         self.driver = driver
         self.db = DatabaseManager()
+        self.url = None
 
     def scrape_basic_match_data(self, url: str):
         """Scrape and save to database"""
@@ -43,15 +45,17 @@ class SerieAScraper:
             for i, row in enumerate(rows):
                 if match := self._extract_match_data(row):
                     self.db.execute_query(
-                        "INSERT INTO raw_matches (date, home, score, away, attendance, report_link, last_updated) "
-                        "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
-                        "ON CONFLICT(date, home, away) DO UPDATE SET "
+                        "INSERT INTO raw_matches (season_link, date, home, score, away, attendance, report_link, last_updated) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                        "ON CONFLICT(season_link, home, away) DO UPDATE SET "
                         "score = COALESCE(score, excluded.score), "
                         "report_link = COALESCE(report_link, excluded.report_link), "
+                        "season_link = excluded.season_link, "
                         "attendance = excluded.attendance, "
                         "last_updated = CURRENT_TIMESTAMP "
                         "WHERE score IS NULL OR report_link IS NULL",
                         (
+                            match["season_link"],
                             match["date"],
                             match["home"],
                             match["score"],
@@ -69,6 +73,7 @@ class SerieAScraper:
 
     def _get_page(self, url: str) -> BeautifulSoup:
         """Load page with configured delay"""
+        self.url = url
         try:
             self.driver.get(url)
             WebDriverWait(self.driver, 15).until(
@@ -101,6 +106,7 @@ class SerieAScraper:
             else:
                 report_link = None
             results = {
+                "season_link": self.url,
                 "date": date,
                 "home": home,
                 "score": score,

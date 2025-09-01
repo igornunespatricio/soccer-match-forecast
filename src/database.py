@@ -39,15 +39,16 @@ class DatabaseManager:
         """Create raw table with all columns"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(RAW_TABLE_QUERY)
+            # cursor.execute(RAW_TABLE_QUERY)
+            cursor.executescript(RAW_TABLE_QUERY)
 
-            # Create indexes
-            cursor.execute(
-                f"CREATE INDEX IF NOT EXISTS idx_report_link ON {RAW_TABLE}(report_link)"
-            )
-            cursor.execute(
-                f"CREATE INDEX IF NOT EXISTS idx_match_composite ON {RAW_TABLE}(date, home, away)"
-            )
+            # # Create indexes
+            # cursor.execute(
+            #     f"CREATE INDEX IF NOT EXISTS idx_report_link ON {RAW_TABLE}(report_link)"
+            # )
+            # cursor.execute(
+            #     f"CREATE INDEX IF NOT EXISTS idx_match_composite ON {RAW_TABLE}(season_link, home, away)"
+            # )
             conn.commit()
 
     def initialize_transformed_table(self):
@@ -90,9 +91,66 @@ class DatabaseManager:
 
         return results
 
+    def change_primary_key(self):
+        """Change primary key of RAW_TABLE from (date, home, away) to (season_link, home, away)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Step 1: Create a temporary table with the new schema
+            temp_table = f"{RAW_TABLE}_temp"
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {temp_table} (
+                    -- Match data
+                    season_link TEXT NOT NULL,
+                    report_link TEXT UNIQUE,
+                    date TEXT NOT NULL,
+                    home TEXT NOT NULL,
+                    score TEXT,
+                    away TEXT NOT NULL,
+                    attendance TEXT,
+                    team_stats TEXT,
+                    extra_stats TEXT,
+                    
+                    -- Metadata
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                    PRIMARY KEY (season_link, home, away)
+                )
+            """
+            )
+
+            # Step 2: Copy data from old table to new table
+            cursor.execute(
+                f"""
+                INSERT OR IGNORE INTO {temp_table} 
+                (season_link, report_link, date, home, score, away, attendance, team_stats, extra_stats, date_added, last_updated)
+                SELECT season_link, report_link, date, home, score, away, attendance, team_stats, extra_stats, date_added, last_updated
+                FROM {RAW_TABLE} WHERE season_link != ''
+            """
+            )
+
+            # Step 3: Drop the old table
+            cursor.execute(f"DROP TABLE {RAW_TABLE}")
+
+            # Step 4: Rename the temporary table to the original name
+            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {RAW_TABLE}")
+
+            # Step 5: Recreate indexes
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_report_link ON {RAW_TABLE}(report_link)"
+            )
+            cursor.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_match_composite ON {RAW_TABLE}(season_link, home, away)"
+            )
+
+            conn.commit()
+            logger.info("Successfully changed primary key to (season_link, home, away)")
+
 
 if __name__ == "__main__":
     db = DatabaseManager()
-    db.initialize_db()
-    # db._delete_all_data(TRANSFORMED_TABLE)
-    # db._delete_table(TRANSFORMED_TABLE)
+    # db.initialize_db()
+    db.initialize_raw_table()
+    # db.change_primary_key()

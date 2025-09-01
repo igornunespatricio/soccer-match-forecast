@@ -25,6 +25,7 @@ logger = get_logger(
 @dataclass
 class Match:
     # Original match data
+    season_link: str
     date: date
     home: str
     home_score: int
