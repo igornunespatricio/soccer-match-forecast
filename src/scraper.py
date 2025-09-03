@@ -27,7 +27,6 @@ class Match:
 
 
 # TODO: Adjust class name to generic soccer scraper
-# TODO: Add raw season link in raw table
 class SerieAScraper:
     def __init__(self, driver: ChromeDriverWrapper):
         self.driver = driver

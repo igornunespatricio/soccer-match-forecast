@@ -148,9 +148,29 @@ class DatabaseManager:
             conn.commit()
             logger.info("Successfully changed primary key to (season_link, home, away)")
 
+    def backfill_season_links(self):
+        """Backfill season_link for already transformed matches"""
+        try:
+            update_query = f"""
+                UPDATE {TRANSFORMED_TABLE} 
+                SET season_link = (
+                    SELECT r.season_link 
+                    FROM {RAW_TABLE} r 
+                    WHERE r.report_link = {TRANSFORMED_TABLE}.report_link
+                )
+                WHERE season_link IS NULL OR season_link = ''
+            """
+
+            result = self.execute_query(update_query)
+            logger.info(f"Backfilled season_link for transformed matches")
+
+        except Exception as e:
+            logger.error(f"Error backfilling season_links: {e}")
+
 
 if __name__ == "__main__":
     db = DatabaseManager()
+    db.backfill_season_links()
     # db.initialize_db()
-    db.initialize_raw_table()
+    # db.initialize_raw_table()
     # db.change_primary_key()

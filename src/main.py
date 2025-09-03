@@ -38,4 +38,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(scrape_basic_match_data=True, scrape_match_reports=False, transform_data=False)
+    main(scrape_basic_match_data=False, scrape_match_reports=False, transform_data=True)

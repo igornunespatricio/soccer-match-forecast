@@ -120,6 +120,7 @@ class DataTransformer:
     def _extract_basic_match_data(self, raw_match: sqlite3.Row) -> Match:
         """Extract basic match data from raw table"""
         try:
+            season_link = raw_match["season_link"]
             date = raw_match["date"]
             home = raw_match["home"]
             home_score = int(raw_match["score"].split("–")[0].strip())
@@ -128,7 +129,14 @@ class DataTransformer:
             report_link = raw_match["report_link"]
             attendance = raw_match["attendance"]
             return Match(
-                date, home, home_score, away_score, away, report_link, attendance
+                season_link,
+                date,
+                home,
+                home_score,
+                away_score,
+                away,
+                report_link,
+                attendance,
             )
         except Exception as e:
             logger.error(f"Error while extracting basic match data: {e}")
