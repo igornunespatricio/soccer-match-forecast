@@ -23,7 +23,6 @@ logger = get_logger(
 )
 
 
-# TODO: add raw season link in transformed table
 class DataTransformer:
     def __init__(self):
         self.db = DatabaseManager()
