@@ -3,15 +3,16 @@ import re
 import sqlite3
 
 from bs4 import BeautifulSoup
-from database import DatabaseManager
-from config import (
+from src.data.database import DatabaseManager
+from src.config import (
     RAW_TABLE,
     TRANSFORMED_TABLE,
     TRANSFORMED_COLUMNS,
     COLUMN_MAP,
     TRANSFORMER_LOGGER_PATH,
 )
-from logger import get_logger
+from src.data.schemas import TransformedMatch
+from src.logger import get_logger
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
@@ -20,75 +21,6 @@ logger = get_logger(
     "Transformer",
     TRANSFORMER_LOGGER_PATH,
 )
-
-
-@dataclass
-class Match:
-    # Original match data
-    season_link: str
-    date: date
-    home: str
-    home_score: int
-    away_score: int
-    away: str
-    report_link: str
-    attendance: Optional[int] = None
-
-    # Transformed team stats
-    home_possession: Optional[float] = None
-    away_possession: Optional[float] = None
-    home_passes_attempts: Optional[int] = None
-    home_passes_completed: Optional[int] = None
-    away_passes_attempts: Optional[int] = None
-    away_passes_completed: Optional[int] = None
-    home_shots_attempts: Optional[int] = None
-    home_shots_completed: Optional[int] = None
-    away_shots_attempts: Optional[int] = None
-    away_shots_completed: Optional[int] = None
-    home_saves_attempts: Optional[int] = None
-    home_saves_completed: Optional[int] = None
-    away_saves_attempts: Optional[int] = None
-    away_saves_completed: Optional[int] = None
-
-    # Transformed extra stats
-    home_fouls: Optional[int] = None
-    away_fouls: Optional[int] = None
-    home_corners: Optional[int] = None
-    away_corners: Optional[int] = None
-    home_crosses: Optional[int] = None
-    away_crosses: Optional[int] = None
-    home_touches: Optional[int] = None
-    away_touches: Optional[int] = None
-    home_tackles: Optional[int] = None
-    away_tackles: Optional[int] = None
-    home_interceptions: Optional[int] = None
-    away_interceptions: Optional[int] = None
-    home_aerials_won: Optional[int] = None
-    away_aerials_won: Optional[int] = None
-    home_clearances: Optional[int] = None
-    away_clearances: Optional[int] = None
-    home_offsides: Optional[int] = None
-    away_offsides: Optional[int] = None
-    home_goal_kicks: Optional[int] = None
-    away_goal_kicks: Optional[int] = None
-    home_throw_ins: Optional[int] = None
-    away_throw_ins: Optional[int] = None
-    home_long_balls: Optional[int] = None
-    away_long_balls: Optional[int] = None
-
-    # Metadata
-    date_added: Optional[datetime] = field(default_factory=datetime.now)
-    last_updated: Optional[datetime] = field(default_factory=datetime.now)
-
-    def update_stats(self, *stat_dics):
-        """Update the match data with new stats"""
-        try:
-            for stat_dic in stat_dics:
-                for key, value in stat_dic.items():
-                    if hasattr(self, key):
-                        setattr(self, key, value)
-        except Exception as e:
-            logger.error(f"Error while updating match stats: {e}")
 
 
 # TODO: add raw season link in transformed table
@@ -117,7 +49,7 @@ class DataTransformer:
         except Exception as e:
             logger.error(f"Error while generating raw match data: {e}")
 
-    def _extract_basic_match_data(self, raw_match: sqlite3.Row) -> Match:
+    def _extract_basic_match_data(self, raw_match: sqlite3.Row) -> TransformedMatch:
         """Extract basic match data from raw table"""
         try:
             season_link = raw_match["season_link"]
@@ -128,7 +60,7 @@ class DataTransformer:
             away = raw_match["away"]
             report_link = raw_match["report_link"]
             attendance = raw_match["attendance"]
-            return Match(
+            return TransformedMatch(
                 season_link,
                 date,
                 home,
@@ -140,7 +72,7 @@ class DataTransformer:
             )
         except Exception as e:
             logger.error(f"Error while extracting basic match data: {e}")
-            return Match
+            return TransformedMatch
 
     def _extract_team_stats_data(self, raw_match: sqlite3.Row) -> dict:
         """Extract team stats data from raw table"""
@@ -239,7 +171,7 @@ class DataTransformer:
             logger.error(f"Error while extracting extra stats data: {e}")
             return {}
 
-    def _save_transformed_data(self, match: Match) -> None:
+    def _save_transformed_data(self, match: TransformedMatch) -> None:
         """Save transformed match data to database"""
         try:
             columns = ", ".join(TRANSFORMED_COLUMNS)
@@ -297,8 +229,3 @@ class DataTransformer:
             logger.info(f"Transformation completed!")
         except Exception as e:
             logger.error(f"Error in transformation process: {e}")
-
-
-if __name__ == "__main__":
-    transformer = DataTransformer()
-    transformer.transform()

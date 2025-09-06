@@ -1,0 +1,1 @@
+Get-ChildItem -Recurse -Depth 3 | Select-Object FullName | Format-Table -AutoSize

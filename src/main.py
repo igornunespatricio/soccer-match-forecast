@@ -1,8 +1,9 @@
-from database import DatabaseManager
-from scraper import SerieAScraper
-from config import URLS
-from webdriver import ChromeDriverWrapper
-from transform import DataTransformer
+from src.data.database import DatabaseManager
+from src.scraper.scraper import SerieAScraper
+
+from src.config import URLS
+from src.scraper.webdriver import ChromeDriverWrapper
+from src.transform import DataTransformer
 
 
 def main(
@@ -38,4 +39,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(scrape_basic_match_data=False, scrape_match_reports=False, transform_data=True)
+    main(scrape_basic_match_data=True, scrape_match_reports=True, transform_data=True)
