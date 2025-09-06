@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from config import SCRAPER_LOGGER_PATH  # Import from config
+from src.config import SCRAPER_LOGGER_PATH  # Import from config
 
 
 # TODO: keep log for last 7 days

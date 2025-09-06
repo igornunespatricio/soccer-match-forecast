@@ -5,25 +5,13 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from database import DatabaseManager
-from webdriver import ChromeDriverWrapper
-from logger import get_logger
-from config import REQUEST_DELAY, SCRAPER_LOGGER_PATH, URLS, RAW_TABLE
+from src.data.database import DatabaseManager
+from src.scraper.webdriver import ChromeDriverWrapper
+from src.logger import get_logger
+from src.config import REQUEST_DELAY, SCRAPER_LOGGER_PATH, URLS, RAW_TABLE
+from src.data.schemas import RawMatch
 
 logger = get_logger("SerieAScraper", SCRAPER_LOGGER_PATH)
-
-
-@dataclass
-class Match:
-    season_link: str
-    date: str
-    home: str
-    score: str
-    away: str
-    attendance: str
-    report_link: str
-    team_stats: str
-    team_stats_extra: str
 
 
 # TODO: Adjust class name to generic soccer scraper
@@ -162,16 +150,3 @@ class SerieAScraper:
 
         except Exception as e:
             logger.error(f"Error while scraping match reports: {e}")
-
-
-if __name__ == "__main__":
-    driver_manager = ChromeDriverWrapper(headless=True)
-    driver = driver_manager.get_driver()
-
-    try:
-        scraper = SerieAScraper(driver)
-        scraper.scrape_basic_match_data(url=URLS[0])
-        # scraper.scrape_match_reports()
-
-    finally:
-        driver_manager.close()
