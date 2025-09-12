@@ -9,7 +9,9 @@
 │   └── transformer.log
 ├── notebooks
 │   ├── eda.ipynb
-│   └── eda_nn.ipynb
+│   ├── eda_nn.ipynb
+│   ├── eda_nn_specialized_model.ipynb
+│   └── eda_nn_transformer.ipynb
 ├── scripts
 │   ├── generate_markdown_tree.sh
 │   ├── getStructure.ps1
@@ -32,14 +34,12 @@
 ├── PROJECT_STRUCTURE.md
 ├── README.md
 ├── main.py
-├── notes.txt
 ├── poetry.lock
-├── pyproject.toml
-└── test.py
+└── pyproject.toml
 
 9 directories, 26 files
 ```
 
 ***
-*Generated on: Thu Sep 11 17:29:02 -03 2025*
+*Generated on: Fri Sep 12 20:07:44 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst`*
