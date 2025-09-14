@@ -4,8 +4,14 @@ from pathlib import Path
 # Path definitons
 # ==========================================================================
 DATABASE_PATH = Path(__file__).parent.parent / "data"
-SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
-TRANSFORMER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "transformer.log"
+PROCESSED_TENSORS_PATH = DATABASE_PATH / "processed_tensors"
+LOGS_PATH = Path(__file__).parent.parent / "logs"
+DEFAULT_LOGGER_PATH = LOGS_PATH / "default.log"
+SCRAPER_LOGGER_PATH = LOGS_PATH / "scraper.log"
+TRANSFORMER_LOGGER_PATH = LOGS_PATH / "transformer.log"
+DATABASE_LOGGER_PATH = LOGS_PATH / "database.log"
+ML_PROCESSOR_LOGGER_PATH = LOGS_PATH / "ml_preprocessor.log"
+ML_TRAINER_LOGGER_PATH = LOGS_PATH / "ml_trainer.log"
 # ==========================================================================
 # Web Scraper Configuration
 # ==========================================================================
@@ -220,3 +226,7 @@ TRANSFOMED_TABLE_QUERY = f"""
                     PRIMARY KEY (report_link)
                 )
                 """
+
+# ==========================================================================
+# ML Configuration
+# ==========================================================================

@@ -12,10 +12,11 @@ from src.config import (
     TRANSFORMED_TABLE,
     RAW_TABLE_QUERY,
     TRANSFOMED_TABLE_QUERY,
+    DATABASE_LOGGER_PATH,
 )
 from src.logger import get_logger
 
-logger = get_logger("Database")
+logger = get_logger("Database", DATABASE_LOGGER_PATH)
 
 
 class DatabaseManager:
