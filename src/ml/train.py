@@ -1,6 +1,11 @@
 import tensorflow as tf
 from src.logger import get_logger
-from src.config import ML_TRAINER_LOGGER_PATH, PROCESSED_TENSORS_PATH
+from src.config import (
+    ML_TRAINER_LOGGER_PATH,
+    PROCESSED_TENSORS_PATH,
+    MODEL_ARCHITECTURE_PATH,
+)
+from src.ml.models import HybridTransformerModel
 
 logger = get_logger("MLTrainer", ML_TRAINER_LOGGER_PATH)
 
@@ -51,9 +56,7 @@ class MLTrainer:
 
             self.target_tensor_train = self.target_tensor[:test_split_idx]
             self.target_tensor_test = self.target_tensor[test_split_idx:]
-            print(self.home_tensor_train.shape, self.home_tensor_test.shape)
-            print(self.away_tensor_train.shape, self.away_tensor_test.shape)
-            print(self.target_tensor_train.shape, self.target_tensor_test.shape)
+
             logger.info(
                 f"Data split successfully:\n Train shape: {self.home_tensor_train.shape}\n Test shape: {self.home_tensor_test.shape}"
             )
@@ -61,7 +64,44 @@ class MLTrainer:
             logger.error(f"Error splitting data: {e}")
 
     def train_model(self):
-        pass
+        """Train model"""
+        # Create model
+        model = HybridTransformerModel(
+            sequence_length=self.home_tensor.shape[1],
+            num_features=self.home_tensor.shape[2],
+            num_classes=len(tf.unique(self.target_tensor).y),
+        )
+
+        # Save model architecture image (this should be in MLTrainer)
+        model_architecture_path = MODEL_ARCHITECTURE_PATH / "model_architecture.png"
+        self._save_model_architecture_image(
+            model.build_model(), model_architecture_path
+        )
+        logger.info(f"Model architecture saved to {model_architecture_path}")
+        # Compile model
+        model.compile(
+            optimizer="adam",
+            loss="sparse_categorical_crossentropy",
+            metrics=["accuracy"],
+        )
+        logger.info("Model compiled successfully")
+
+    def _save_model_architecture_image(
+        self, model, filepath: str = MODEL_ARCHITECTURE_PATH / "model_architecture.png"
+    ):
+        """Save model architecture as an image"""
+        tf.keras.utils.plot_model(
+            model,
+            to_file=filepath,
+            show_shapes=True,
+            show_dtype=True,
+            show_layer_names=True,
+            rankdir="TB",
+            expand_nested=True,
+            dpi=200,
+            show_layer_activations=True,
+            show_trainable=True,
+        )
 
     def evaluate_model(self):
         pass

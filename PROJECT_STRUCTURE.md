@@ -9,7 +9,9 @@
 │   │   └── target_tensor.ten
 │   └── matches.db
 ├── ignore
+│   ├── model_architecture.png
 │   ├── nn_transformer.py
+│   ├── system_dependencies_notes.txt
 │   └── test.py
 ├── logs
 │   ├── database.log
@@ -48,12 +50,13 @@
 ├── PROJECT_STRUCTURE.md
 ├── README.md
 ├── main.py
+├── model_architecture.png
 ├── poetry.lock
 └── pyproject.toml
 
-12 directories, 37 files
+12 directories, 40 files
 ```
 
 ***
-*Generated on: Sun Sep 14 00:02:08 -03 2025*
+*Generated on: Sun Sep 14 10:26:14 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst`*
