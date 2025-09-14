@@ -3,10 +3,19 @@
 ```
 .
 ├── data
+│   ├── processed_tensors
+│   │   ├── away_tensor.ten
+│   │   ├── home_tensor.ten
+│   │   └── target_tensor.ten
 │   └── matches.db
+├── ignore
+│   ├── nn_transformer.py
+│   └── test.py
 ├── logs
-│   ├── scraper.log
-│   └── transformer.log
+│   ├── database.log
+│   ├── ml_preprocessor.log
+│   ├── ml_trainer.log
+│   └── scraper.log
 ├── notebooks
 │   ├── eda.ipynb
 │   ├── eda_nn.ipynb
@@ -21,6 +30,11 @@
 │   │   ├── __init__.py
 │   │   ├── database.py
 │   │   └── schemas.py
+│   ├── ml
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   ├── preprocess.py
+│   │   └── train.py
 │   ├── scraper
 │   │   ├── __init__.py
 │   │   ├── scraper.py
@@ -37,9 +51,9 @@
 ├── poetry.lock
 └── pyproject.toml
 
-9 directories, 26 files
+12 directories, 37 files
 ```
 
 ***
-*Generated on: Fri Sep 12 20:07:44 -03 2025*
+*Generated on: Sun Sep 14 00:02:08 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst`*

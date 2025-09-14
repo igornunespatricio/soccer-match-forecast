@@ -5,6 +5,8 @@ from pathlib import Path
 # ==========================================================================
 DATABASE_PATH = Path(__file__).parent.parent / "data"
 PROCESSED_TENSORS_PATH = DATABASE_PATH / "processed_tensors"
+
+# Logger paths
 LOGS_PATH = Path(__file__).parent.parent / "logs"
 DEFAULT_LOGGER_PATH = LOGS_PATH / "default.log"
 SCRAPER_LOGGER_PATH = LOGS_PATH / "scraper.log"
