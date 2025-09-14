@@ -35,8 +35,30 @@ class MLTrainer:
         except Exception as e:
             logger.error(f"Error loading tensors: {e}")
 
-    def train_val_test_split(self):
-        pass
+    def train_test_split(self, test_size: float = 0.2, val_size: float = 0.2):
+        """Split data into train and test sets"""
+        try:
+            total_samples = self.home_tensor.shape[0]
+            # Calculate test split indice
+            test_split_idx = int(total_samples * (1 - test_size))
+
+            # Split data
+            self.home_tensor_train = self.home_tensor[:test_split_idx]
+            self.home_tensor_test = self.home_tensor[test_split_idx:]
+
+            self.away_tensor_train = self.away_tensor[:test_split_idx]
+            self.away_tensor_test = self.away_tensor[test_split_idx:]
+
+            self.target_tensor_train = self.target_tensor[:test_split_idx]
+            self.target_tensor_test = self.target_tensor[test_split_idx:]
+            print(self.home_tensor_train.shape, self.home_tensor_test.shape)
+            print(self.away_tensor_train.shape, self.away_tensor_test.shape)
+            print(self.target_tensor_train.shape, self.target_tensor_test.shape)
+            logger.info(
+                f"Data split successfully:\n Train shape: {self.home_tensor_train.shape}\n Test shape: {self.home_tensor_test.shape}"
+            )
+        except Exception as e:
+            logger.error(f"Error splitting data: {e}")
 
     def train_model(self):
         pass
@@ -52,7 +74,7 @@ class MLTrainer:
 
     def training_pipeline(self):
         self.load_data()
-        self.train_val_test_split()
+        self.train_test_split()
         self.train_model()
         self.evaluate_model()
         self.save_model()
