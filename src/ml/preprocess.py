@@ -5,7 +5,7 @@ from tqdm import tqdm
 from src.config import (
     PROCESSED_TENSORS_PATH,
     TRANSFORMED_TABLE,
-    ML_PROCESSOR_LOGGER_PATH,
+    ML_LOGGER_PATH,
 )
 from src.data.database import DatabaseManager
 
@@ -13,7 +13,7 @@ from src.logger import get_logger
 
 logger = get_logger(
     "MLPreprocessor",
-    ML_PROCESSOR_LOGGER_PATH,
+    ML_LOGGER_PATH,
 )
 
 

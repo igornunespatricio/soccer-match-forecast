@@ -5,15 +5,14 @@ from pathlib import Path
 # ==========================================================================
 DATABASE_PATH = Path(__file__).parent.parent / "data"
 PROCESSED_TENSORS_PATH = DATABASE_PATH / "processed_tensors"
-MODEL_ARCHITECTURE_PATH = Path(__file__).parent.parent
+MODEL_ARTIFACTS_PATH = Path(__file__).parent.parent / "model_artifacts"
 # Logger paths
 LOGS_PATH = Path(__file__).parent.parent / "logs"
 DEFAULT_LOGGER_PATH = LOGS_PATH / "default.log"
 SCRAPER_LOGGER_PATH = LOGS_PATH / "scraper.log"
 TRANSFORMER_LOGGER_PATH = LOGS_PATH / "transformer.log"
 DATABASE_LOGGER_PATH = LOGS_PATH / "database.log"
-ML_PROCESSOR_LOGGER_PATH = LOGS_PATH / "ml_preprocessor.log"
-ML_TRAINER_LOGGER_PATH = LOGS_PATH / "ml_trainer.log"
+ML_LOGGER_PATH = LOGS_PATH / "ml.log"
 # ==========================================================================
 # Web Scraper Configuration
 # ==========================================================================
