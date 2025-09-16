@@ -23,6 +23,7 @@ class Preprocessor:
         self.n = n  # last n matches
         self.df = None
 
+    # TODO: need to concatenate future matches (with no score) for prediction. Get from raw_table
     def read_data(self):
         """Get transformed data from database and return as pandas DataFrame"""
         try:
@@ -71,6 +72,7 @@ class Preprocessor:
             logger.error(f"Error creating empty tensors: {e}")
         return self.home_tensor, self.away_tensor, self.target_tensor
 
+    # TODO: logic to filter last n valid matches - matches that don't contain any NULL value in self.feature_cols
     def _filter_last_n_matches(self, team_name: str, date):
         """Return last n matches for team_name before date"""
         try:
@@ -131,6 +133,7 @@ class Preprocessor:
             logger.error(f"Error processing tensors: {e}")
         return self.home_tensor, self.away_tensor, self.target_tensor
 
+    # TODO: remove this method once the logic to save per match is implemented
     def _save_processed_tensors(self, path):
         """Save processed tensors using TensorFlow's recommended approach"""
         try:
@@ -164,7 +167,9 @@ class Preprocessor:
             away_team = row["away"]
             home_score = row["home_score"]
             away_score = row["away_score"]
+            season_link = row["season_link"]
             report_link = row["report_link"]
+            current_match = f"{season_link}-{home_team}-{away_team}"
 
             # filters home and away last n matches
             home_last_n = self._filter_last_n_matches(home_team, temp_date)
@@ -192,9 +197,11 @@ class Preprocessor:
                     and not away_temp_df.isnull().values.any()
                 ):
                     self._process_tensors(home_temp_df, away_temp_df, target_value)
+                    # TODO: save current match info in PREDICT_METADATA_TABLE
+                    # TODO: save current match tensors in PROCESSED_TENSORS_PATH/{match_uuid}/ directory
                 else:
                     logger.info(
-                        f"At least one of {self.n} previous matches used to build tensor for match {report_link} is missing data. Skipping..."
+                        f"At least one of {self.n} previous matches used to build tensor for match {current_match} is missing data. Skipping..."
                     )
             if i % 100 == 0:
                 logger.info(
