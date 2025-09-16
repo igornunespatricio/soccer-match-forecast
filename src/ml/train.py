@@ -18,9 +18,6 @@ logger = get_logger("MLTrainer", ML_LOGGER_PATH)
 
 class MLTrainer:
     def __init__(self):
-        self.home_tensor = None
-        self.away_tensor = None
-        self.target_tensor = None
         self.db = DatabaseManager()
 
     def load_data(self):
@@ -29,17 +26,20 @@ class MLTrainer:
             match_uuid_df = self.db.get_dataframe(
                 f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE type = 'training'"
             )
+            home_tensors = []
+            away_tensors = []
+            target_tensors = []
             for match_uuid in match_uuid_df["match_uuid"]:
                 path = PROCESSED_TENSORS_PATH / match_uuid
                 if path.exists():
                     home_serialized = tf.io.read_file(
-                        str(PROCESSED_TENSORS_PATH / "home_tensor.ten")
+                        str(PROCESSED_TENSORS_PATH / match_uuid / "home_tensor.ten")
                     )
                     away_serialized = tf.io.read_file(
-                        str(PROCESSED_TENSORS_PATH / "away_tensor.ten")
+                        str(PROCESSED_TENSORS_PATH / match_uuid / "away_tensor.ten")
                     )
                     target_serialized = tf.io.read_file(
-                        str(PROCESSED_TENSORS_PATH / "target_tensor.ten")
+                        str(PROCESSED_TENSORS_PATH / match_uuid / "target_tensor.ten")
                     )
                     home_tensor_temp = tf.io.parse_tensor(
                         home_serialized, out_type=tf.float32
@@ -51,16 +51,15 @@ class MLTrainer:
                         target_serialized, out_type=tf.int32
                     )
 
-                    self.home_tensor = tf.concat(
-                        [self.home_tensor, home_tensor_temp], axis=0
-                    )
-                    self.away_tensor = tf.concat(
-                        [self.away_tensor, away_tensor_temp], axis=0
-                    )
-                    self.target_tensor = tf.concat(
-                        [self.target_tensor, target_tensor_temp], axis=0
-                    )
+                    home_tensors.append(home_tensor_temp)
+                    away_tensors.append(away_tensor_temp)
+                    target_tensors.append(target_tensor_temp)
 
+            # Concatenate all collected tensors
+            if home_tensors:
+                self.home_tensor = tf.concat(home_tensors, axis=0)
+                self.away_tensor = tf.concat(away_tensors, axis=0)
+                self.target_tensor = tf.concat(target_tensors, axis=0)
             logger.info(
                 f"Tensors loaded successfully:\nhome: {self.home_tensor.shape}\naway:{self.away_tensor.shape}\ntarget {self.target_tensor.shape}"
             )
@@ -209,6 +208,8 @@ class MLTrainer:
             import matplotlib.pyplot as plt
             import seaborn as sns
 
+            # create charts dir
+            chart_dir.mkdir(parents=True, exist_ok=True)
             # Set style
             sns.set_style("whitegrid")
             plt.rcParams["figure.figsize"] = [10, 6]
