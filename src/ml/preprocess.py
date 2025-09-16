@@ -3,7 +3,9 @@ import pandas as pd
 import tensorflow as tf
 from tqdm import tqdm
 from src.config import (
+    PREDICT_METADATA_TABLE,
     PROCESSED_TENSORS_PATH,
+    RAW_TABLE,
     TRANSFORMED_TABLE,
     ML_LOGGER_PATH,
 )
@@ -23,14 +25,20 @@ class Preprocessor:
         self.n = n  # last n matches
         self.df = None
 
-    # TODO: need to concatenate future matches (with no score) for prediction. Get from raw_table
     def read_data(self):
         """Get transformed data from database and return as pandas DataFrame"""
         try:
-            self.df = self.db.get_dataframe(
+            df_transformed = self.db.get_dataframe(
                 f"SELECT * FROM {TRANSFORMED_TABLE} ORDER BY date ASC"
             )
+            df_raw = self.db.get_dataframe(
+                f"SELECT date, home, away FROM {RAW_TABLE} WHERE score IS NULL ORDER BY date ASC"
+            )
+            self.df = pd.concat([df_transformed, df_raw], ignore_index=True)
             self.df.sort_values("date", inplace=True, ascending=True)
+            logger.info(
+                f"Successfully read DataFrame with shape: {self.df.shape}. Rows without score: {self.df[self.df['home_score'].isnull()].shape[0]}"
+            )
         except Exception as e:
             logger.error(f"Error reading data from database: {e}")
         return self.df
@@ -76,8 +84,10 @@ class Preprocessor:
     def _filter_last_n_matches(self, team_name: str, date):
         """Return last n matches for team_name before date"""
         try:
-            last_n_mask = (self.df["date"] < date) & (
-                (self.df["home"] == team_name) | (self.df["away"] == team_name)
+            last_n_mask = (
+                (self.df["date"] < date)
+                & ((self.df["home"] == team_name) | (self.df["away"] == team_name))
+                & (self.df[self.feature_cols].notnull().all(axis=1))
             )
         except Exception as e:
             logger.error(f"Error filtering last n matches: {e}")
@@ -133,26 +143,53 @@ class Preprocessor:
             logger.error(f"Error processing tensors: {e}")
         return self.home_tensor, self.away_tensor, self.target_tensor
 
-    # TODO: remove this method once the logic to save per match is implemented
-    def _save_processed_tensors(self, path):
-        """Save processed tensors using TensorFlow's recommended approach"""
-        try:
-            # Create directory if it doesn't exist
-            path.mkdir(parents=True, exist_ok=True)
+    def _save_match_metadata_in_db(
+        self, season_link, date, home_team, away_team, score, target_value, type
+    ):
+        self.db.execute_query(
+            f"""
+                        INSERT INTO {PREDICT_METADATA_TABLE} 
+                            (season_link, date, home, away, score, winner, type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(season_link, home, away) 
+                        DO UPDATE SET
+                            score = excluded.score,
+                            winner = excluded.winner,
+                            type = excluded.type,
+                            last_updated = CURRENT_TIMESTAMP
+                        """,
+            params=(
+                season_link,
+                date,
+                home_team,
+                away_team,
+                score,
+                target_value,
+                "training" if score is not None else "prediction",
+            ),
+        )
 
-            # Save tensors using tf.io.write_file or convert to numpy and save
-            tf.io.write_file(
-                str(path / "home_tensor.ten"), tf.io.serialize_tensor(self.home_tensor)
-            )
-            tf.io.write_file(
-                str(path / "away_tensor.ten"), tf.io.serialize_tensor(self.away_tensor)
-            )
-            tf.io.write_file(
-                str(path / "target_tensor.ten"),
-                tf.io.serialize_tensor(self.target_tensor),
-            )
-        except Exception as e:
-            logger.error(f"Error saving processed tensors: {e}")
+    def _save_current_match_tensors(
+        self, season_link, home_team, away_team, home_tensor, away_tensor, target_tensor
+    ):
+        match = self.db.execute_query(
+            f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE season_link = '{season_link}' AND home = '{home_team}' AND away = '{away_team}'",
+        )
+        match_uuid = match[0][0]
+        # Create directory if it doesn't exist
+        path = PROCESSED_TENSORS_PATH / match_uuid
+        path.mkdir(parents=True, exist_ok=True)
+        # Save tensors using tf.io.write_file or convert to numpy and save
+        tf.io.write_file(
+            str(path / "home_tensor.ten"), tf.io.serialize_tensor(self.home_tensor)
+        )
+        tf.io.write_file(
+            str(path / "away_tensor.ten"), tf.io.serialize_tensor(self.away_tensor)
+        )
+        tf.io.write_file(
+            str(path / "target_tensor.ten"),
+            tf.io.serialize_tensor(self.target_tensor),
+        )
 
     def preprocess(self):
         """Preprocess data and save processed tensors"""
@@ -170,7 +207,11 @@ class Preprocessor:
             season_link = row["season_link"]
             report_link = row["report_link"]
             current_match = f"{season_link}-{home_team}-{away_team}"
-
+            score = (
+                f"{home_score}-{away_score}"
+                if home_score is not None and away_score is not None
+                else None
+            )
             # filters home and away last n matches
             home_last_n = self._filter_last_n_matches(home_team, temp_date)
             away_last_n = self._filter_last_n_matches(away_team, temp_date)
@@ -196,19 +237,37 @@ class Preprocessor:
                     not home_temp_df.isnull().values.any()
                     and not away_temp_df.isnull().values.any()
                 ):
-                    self._process_tensors(home_temp_df, away_temp_df, target_value)
+                    self.home_tensor, self.away_tensor, self.target_tensor = (
+                        self._process_tensors(home_temp_df, away_temp_df, target_value)
+                    )
                     # TODO: save current match info in PREDICT_METADATA_TABLE
+                    self._save_match_metadata_in_db(
+                        season_link,
+                        temp_date,
+                        home_team,
+                        away_team,
+                        score,
+                        target_value,
+                        "training" if score is not None else "prediction",
+                    )
+
                     # TODO: save current match tensors in PROCESSED_TENSORS_PATH/{match_uuid}/ directory
+                    self._save_current_match_tensors(
+                        season_link,
+                        home_team,
+                        away_team,
+                        self.home_tensor,
+                        self.away_tensor,
+                        self.target_tensor,
+                    )
                 else:
                     logger.info(
                         f"At least one of {self.n} previous matches used to build tensor for match {current_match} is missing data. Skipping..."
                     )
             if i % 100 == 0:
-                logger.info(
-                    f"Processed {i}/{self.df.shape[0]} matches. Current tensor shape is {self.home_tensor.shape}"
-                )
-        self._save_processed_tensors(PROCESSED_TENSORS_PATH)
-        return self.home_tensor, self.away_tensor, self.target_tensor
+                logger.info(f"Processed {i}/{self.df.shape[0]} matches.")
+                if i == 400:
+                    break
 
 
 if __name__ == "__main__":
