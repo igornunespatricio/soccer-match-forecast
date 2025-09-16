@@ -110,10 +110,10 @@ class MLTrainer:
                 monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6, verbose=1
             ),
             tf.keras.callbacks.ModelCheckpoint(
-                filepath=str(MODEL_ARTIFACTS_PATH / "best_model.weights.h5"),
+                filepath=str(MODEL_ARTIFACTS_PATH / "best_model.keras"),
                 monitor="val_accuracy",
                 save_best_only=True,
-                save_weights_only=True,
+                save_weights_only=False,
                 verbose=1,
             ),
         ]
@@ -136,12 +136,11 @@ class MLTrainer:
             show_trainable=True,
         )
 
-    # TODO: save model with new keras version .keras instead of .h5
     def save_model(self):
         """Save the trained model"""
         try:
             # Save the full model (architecture + weights + optimizer state)
-            model_path = MODEL_ARTIFACTS_PATH / "final_model.h5"
+            model_path = MODEL_ARTIFACTS_PATH / "final_model.keras"
             self.model.save(model_path)
             logger.info(f"Final model saved to {model_path}")
 

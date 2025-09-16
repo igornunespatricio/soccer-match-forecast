@@ -25,8 +25,8 @@
 │   │   ├── learning_rate_chart.png
 │   │   ├── loss_chart.png
 │   │   └── training_metrics_overview.png
-│   ├── best_model.weights.h5
-│   ├── final_model.h5
+│   ├── best_model.keras
+│   ├── final_model.keras
 │   ├── model_architecture.json
 │   ├── model_architecture.png
 │   ├── model_summary.txt
@@ -47,8 +47,8 @@
 │   │   └── schemas.py
 │   ├── ml
 │   │   ├── __init__.py
-│   │   ├── evaluate.py
 │   │   ├── models.py
+│   │   ├── predict.py
 │   │   ├── preprocess.py
 │   │   └── train.py
 │   ├── scraper
@@ -72,5 +72,5 @@
 ```
 
 ***
-*Generated on: Mon Sep 15 09:56:14 -03 2025*
+*Generated on: Mon Sep 15 20:28:44 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst`*
