@@ -76,6 +76,7 @@ DATABASE_CONFIG = {
 }
 RAW_TABLE = "raw_matches"
 TRANSFORMED_TABLE = "transformed_matches"
+PREDICT_METADATA_TABLE = "predict_metadata"
 
 TRANSFORMED_COLUMNS = [
     "season_link",
@@ -227,6 +228,28 @@ TRANSFOMED_TABLE_QUERY = f"""
                     PRIMARY KEY (report_link)
                 )
                 """
+
+PREDICT_METADATA_TABLE_QUERY = f"""
+                CREATE TABLE IF NOT EXISTS {PREDICT_METADATA_TABLE} (
+                    -- Unique identifier for tensor storage
+                    match_uuid TEXT NOT NULL UNIQUE DEFAULT (LOWER(HEX(RANDOMBLOB(16)))),
+                    
+                    -- Match data
+                    season_link TEXT NOT NULL,
+                    date DATE NOT NULL,
+                    home TEXT NOT NULL,
+                    away TEXT NOT NULL,
+                    score TEXT,
+                    winner TEXT,
+                    type TEXT,
+
+                    -- Metadata
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                    PRIMARY KEY (season_link, home, away)  -- Composite primary key
+                )
+"""
 
 # ==========================================================================
 # ML Configuration

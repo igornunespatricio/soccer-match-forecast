@@ -218,9 +218,10 @@ class DataTransformer:
                     extra_stats = self._extract_extra_stats_data(raw_match)
                     match.update_stats(team_stats, extra_stats)
                     self._save_transformed_data(match)
-                    logger.info(
-                        f"Transformed match {i+1}/{total_matches_transform} - {match.home} {match.home_score} x {match.away_score} {match.away} - {match.report_link}"
-                    )
+                    if i % 100 == 0:
+                        logger.info(
+                            f"Transformed match {i+1}/{total_matches_transform} - {match.home} {match.home_score} x {match.away_score} {match.away} - {match.report_link}"
+                        )
                 except Exception as e:
                     logger.error(
                         f"Error while transforming match {match.report_link}: {e}"
@@ -228,3 +229,8 @@ class DataTransformer:
             logger.info(f"Transformation completed!")
         except Exception as e:
             logger.error(f"Error in transformation process: {e}")
+
+
+if __name__ == "__main__":
+    transformer = DataTransformer()
+    transformer.transform()

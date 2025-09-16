@@ -8,6 +8,8 @@ import time
 import pandas as pd
 from src.config import (
     DATABASE_CONFIG,
+    PREDICT_METADATA_TABLE,
+    PREDICT_METADATA_TABLE_QUERY,
     RAW_TABLE,
     TRANSFORMED_TABLE,
     RAW_TABLE_QUERY,
@@ -67,10 +69,18 @@ class DatabaseManager:
             )
             conn.commit()
 
+    def initialize_predict_metadata_table(self):
+        """Create predict_metadata table"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(PREDICT_METADATA_TABLE_QUERY)
+            conn.commit()
+
     def initialize_db(self):
         """initialize_db creates the necessary tables and indexes for the database."""
         self.initialize_raw_table()
         self.initialize_transformed_table()
+        self.initialize_predict_metadata_table()
 
     def _delete_tables(self, table_names: list[str]):
         """Delete listed tables. BE CAREFULLY!"""
@@ -192,3 +202,10 @@ class DatabaseManager:
             logger.error(f"Error fetching DataFrame: {e}")
             # Return empty DataFrame on error
             return pd.DataFrame()
+
+
+if __name__ == "__main__":
+    db = DatabaseManager()
+    db.initialize_db()
+    # delete predict metadata table
+    # db.execute_query(f"DROP TABLE IF EXISTS {PREDICT_METADATA_TABLE};")
