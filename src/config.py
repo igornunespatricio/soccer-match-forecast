@@ -242,6 +242,10 @@ PREDICT_METADATA_TABLE_QUERY = f"""
                     score TEXT,
                     winner TEXT,
                     type TEXT,
+                    home_win_pred_prob REAL,
+                    draw_pred_prob REAL,
+                    away_win_pred_prob REAL,
+                    report_link TEXT,
 
                     -- Metadata
                     date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

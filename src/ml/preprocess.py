@@ -102,7 +102,13 @@ class Preprocessor:
         """
         try:
             target = (
-                0 if home_score > away_score else 1 if away_score > home_score else 2
+                None
+                if home_score is None or away_score is None
+                else (
+                    0
+                    if home_score > away_score
+                    else 1 if away_score > home_score else 2
+                )
             )
         except Exception as e:
             logger.error(f"Error getting target value: {e}")
@@ -128,29 +134,25 @@ class Preprocessor:
         """Convert temp dataframes to tensors and add to existing tensors"""
         try:
             # Conver to tensors
-            home_temp_tensor = tf.convert_to_tensor(home_df.values, dtype=tf.float32)
-            away_temp_tensor = tf.convert_to_tensor(away_df.values, dtype=tf.float32)
-            target_temp_tensor = tf.convert_to_tensor([target], dtype=tf.int32)
+            home_tensor = tf.convert_to_tensor(home_df.values, dtype=tf.float32)
+            away_tensor = tf.convert_to_tensor(away_df.values, dtype=tf.float32)
+            target_tensor = tf.convert_to_tensor([target], dtype=tf.int32)
             # Add batch dimension and concatenate
-            home_temp_tensor = tf.expand_dims(home_temp_tensor, axis=0)
-            away_temp_tensor = tf.expand_dims(away_temp_tensor, axis=0)
-            self.home_tensor = tf.concat([self.home_tensor, home_temp_tensor], axis=0)
-            self.away_tensor = tf.concat([self.away_tensor, away_temp_tensor], axis=0)
-            self.target_tensor = tf.concat(
-                [self.target_tensor, target_temp_tensor], axis=0
-            )
+            home_tensor = tf.expand_dims(home_tensor, axis=0)
+            away_tensor = tf.expand_dims(away_tensor, axis=0)
+
         except Exception as e:
             logger.error(f"Error processing tensors: {e}")
-        return self.home_tensor, self.away_tensor, self.target_tensor
+        return home_tensor, away_tensor, target_tensor
 
     def _save_match_metadata_in_db(
-        self, season_link, date, home_team, away_team, score, target_value, type
+        self, season_link, date, home_team, away_team, score, target_value, report_link
     ):
         self.db.execute_query(
             f"""
                         INSERT INTO {PREDICT_METADATA_TABLE} 
-                            (season_link, date, home, away, score, winner, type)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                            (season_link, date, home, away, score, winner, type, report_link)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(season_link, home, away) 
                         DO UPDATE SET
                             score = excluded.score,
@@ -166,6 +168,7 @@ class Preprocessor:
                 score,
                 target_value,
                 "training" if score is not None else "prediction",
+                report_link,
             ),
         )
 
@@ -248,7 +251,7 @@ class Preprocessor:
                         away_team,
                         score,
                         target_value,
-                        "training" if score is not None else "prediction",
+                        report_link,
                     )
 
                     # TODO: save current match tensors in PROCESSED_TENSORS_PATH/{match_uuid}/ directory

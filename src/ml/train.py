@@ -2,9 +2,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import tensorflow as tf
+from src.data.database import DatabaseManager
 from src.logger import get_logger
 from src.config import (
     ML_LOGGER_PATH,
+    PREDICT_METADATA_TABLE,
     PROCESSED_TENSORS_PATH,
     MODEL_ARTIFACTS_PATH,
     MODEL_ARTIFACTS_PATH,
@@ -19,24 +21,45 @@ class MLTrainer:
         self.home_tensor = None
         self.away_tensor = None
         self.target_tensor = None
+        self.db = DatabaseManager()
 
     def load_data(self):
         """Load tensors from processed_tensors directory"""
         try:
-            home_serialized = tf.io.read_file(
-                str(PROCESSED_TENSORS_PATH / "home_tensor.ten")
+            match_uuid_df = self.db.get_dataframe(
+                f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE type = 'training'"
             )
-            away_serialized = tf.io.read_file(
-                str(PROCESSED_TENSORS_PATH / "away_tensor.ten")
-            )
-            target_serialized = tf.io.read_file(
-                str(PROCESSED_TENSORS_PATH / "target_tensor.ten")
-            )
-            self.home_tensor = tf.io.parse_tensor(home_serialized, out_type=tf.float32)
-            self.away_tensor = tf.io.parse_tensor(away_serialized, out_type=tf.float32)
-            self.target_tensor = tf.io.parse_tensor(
-                target_serialized, out_type=tf.int32
-            )
+            for match_uuid in match_uuid_df["match_uuid"]:
+                path = PROCESSED_TENSORS_PATH / match_uuid
+                if path.exists():
+                    home_serialized = tf.io.read_file(
+                        str(PROCESSED_TENSORS_PATH / "home_tensor.ten")
+                    )
+                    away_serialized = tf.io.read_file(
+                        str(PROCESSED_TENSORS_PATH / "away_tensor.ten")
+                    )
+                    target_serialized = tf.io.read_file(
+                        str(PROCESSED_TENSORS_PATH / "target_tensor.ten")
+                    )
+                    home_tensor_temp = tf.io.parse_tensor(
+                        home_serialized, out_type=tf.float32
+                    )
+                    away_tensor_temp = tf.io.parse_tensor(
+                        away_serialized, out_type=tf.float32
+                    )
+                    target_tensor_temp = tf.io.parse_tensor(
+                        target_serialized, out_type=tf.int32
+                    )
+
+                    self.home_tensor = tf.concat(
+                        [self.home_tensor, home_tensor_temp], axis=0
+                    )
+                    self.away_tensor = tf.concat(
+                        [self.away_tensor, away_tensor_temp], axis=0
+                    )
+                    self.target_tensor = tf.concat(
+                        [self.target_tensor, target_tensor_temp], axis=0
+                    )
 
             logger.info(
                 f"Tensors loaded successfully:\nhome: {self.home_tensor.shape}\naway:{self.away_tensor.shape}\ntarget {self.target_tensor.shape}"
