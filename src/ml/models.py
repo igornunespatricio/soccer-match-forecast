@@ -1,9 +1,14 @@
 # src/ml/models.py
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
+
+# from tensorflow import keras
+from tensorflow.keras import layers, Model
 
 
+@tf.keras.utils.register_keras_serializable(
+    package="CustomModels", name="TransformerBlock"
+)
 class TransformerBlock(layers.Layer):
     """Custom Transformer block with residual connection and layer normalization"""
 
@@ -31,6 +36,9 @@ class TransformerBlock(layers.Layer):
         return config
 
 
+@tf.keras.utils.register_keras_serializable(
+    package="CustomModels", name="TeamProcessor"
+)
 class TeamProcessor(layers.Layer):
     """Processes either home or away team data through the same architecture"""
 
@@ -55,6 +63,9 @@ class TeamProcessor(layers.Layer):
         return config
 
 
+@tf.keras.utils.register_keras_serializable(
+    package="CustomModels", name="HybridTransformerModel"
+)
 class HybridTransformerModel(keras.Model):
     """Hybrid Transformer model for match prediction"""
 
@@ -69,13 +80,17 @@ class HybridTransformerModel(keras.Model):
         model_name="hybrid_transformer",
         **kwargs,
     ):
+        # Remove 'name' from kwargs to avoid conflict with model_name
+        kwargs.pop("name", None)
         super().__init__(name=model_name, **kwargs)
+
         self.sequence_length = sequence_length
         self.num_features = num_features
         self.num_classes = num_classes
         self.num_heads = num_heads
         self.dense_units = dense_units
         self.dropout_rates = dropout_rates
+        self.model_name = model_name  # Store for serialization
 
         # Calculate key dimension (ensure it's divisible by num_heads)
         key_dim = max(num_features // num_heads, 1)
@@ -143,9 +158,16 @@ class HybridTransformerModel(keras.Model):
                 "num_heads": self.num_heads,
                 "dense_units": self.dense_units,
                 "dropout_rates": self.dropout_rates,
+                "model_name": self.model_name,
             }
         )
         return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Handle the name parameter properly during deserialization
+        model_name = config.pop("model_name", "hybrid_transformer")
+        return cls(model_name=model_name, **config)
 
 
 # Factory function for backward compatibility

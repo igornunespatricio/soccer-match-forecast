@@ -380,7 +380,7 @@ class MLTrainer:
     def training_pipeline(self):
         self.load_data()
         self.train_test_split()
-        self.train_model(epochs=30, batch_size=64)
+        self.train_model(epochs=5, batch_size=64)
         self.save_model()
         self.save_metrics()
 
