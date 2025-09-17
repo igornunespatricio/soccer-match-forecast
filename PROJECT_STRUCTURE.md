@@ -3,10 +3,6 @@
 ```
 .
 ├── data
-│   ├── processed_tensors
-│   │   ├── away_tensor.ten
-│   │   ├── home_tensor.ten
-│   │   └── target_tensor.ten
 │   └── matches.db
 ├── ignore
 │   ├── model_architecture.png
@@ -15,10 +11,7 @@
 │   └── test.py
 ├── logs
 │   ├── database.log
-│   ├── ml.log
-│   ├── ml_preprocessor.log
-│   ├── ml_trainer.log
-│   └── scraper.log
+│   └── ml.log
 ├── model_artifacts
 │   ├── charts
 │   │   ├── accuracy_chart.png
@@ -64,13 +57,13 @@
 ├── PROJECT_STRUCTURE.md
 ├── README.md
 ├── main.py
-├── model_architecture.png
 ├── poetry.lock
 └── pyproject.toml
 
-14 directories, 52 files
+13 directories, 45 files
 ```
 
 ***
-*Generated on: Mon Sep 15 20:28:44 -03 2025*
-*Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst`*
+*Generated on: Tue Sep 16 23:30:52 -03 2025*
+*Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst | awk filtering`*
+*Note: data/processed_tensors directory excluded (contains many UUID folders with tensor files)*
