@@ -1,3 +1,5 @@
+import sys
+import traceback
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -32,7 +34,7 @@ class Preprocessor:
                 f"SELECT * FROM {TRANSFORMED_TABLE} ORDER BY date ASC"
             )
             df_raw = self.db.get_dataframe(
-                f"SELECT date, home, away FROM {RAW_TABLE} WHERE score IS NULL ORDER BY date ASC"
+                f"SELECT season_link, date, home, away FROM {RAW_TABLE} WHERE score IS NULL ORDER BY date ASC"
             )
             self.df = pd.concat([df_transformed, df_raw], ignore_index=True)
             self.df.sort_values("date", inplace=True, ascending=True)
@@ -69,18 +71,17 @@ class Preprocessor:
     def _create_constant_tensors(self):
         # Create empty tensors
         try:
-            self.home_tensor = tf.constant(
+            home_tensor = tf.constant(
                 [], dtype=tf.float32, shape=[0, self.n, len(self.feature_cols)]
             )
-            self.away_tensor = tf.constant(
+            away_tensor = tf.constant(
                 [], dtype=tf.float32, shape=[0, self.n, len(self.feature_cols)]
             )
-            self.target_tensor = tf.constant([], dtype=tf.int32, shape=[0])
+            target_tensor = tf.constant([], dtype=tf.int32, shape=[0])
         except Exception as e:
             logger.error(f"Error creating empty tensors: {e}")
-        return self.home_tensor, self.away_tensor, self.target_tensor
+        return home_tensor, away_tensor, target_tensor
 
-    # TODO: logic to filter last n valid matches - matches that don't contain any NULL value in self.feature_cols
     def _filter_last_n_matches(self, team_name: str, date):
         """Return last n matches for team_name before date"""
         try:
@@ -103,7 +104,7 @@ class Preprocessor:
         try:
             target = (
                 None
-                if home_score is None or away_score is None
+                if pd.isna(home_score) or pd.isna(away_score)
                 else (
                     0
                     if home_score > away_score
@@ -131,13 +132,16 @@ class Preprocessor:
         return temp_df
 
     def _process_tensors(self, home_df, away_df, target):
-        """Convert temp dataframes to tensors and add to existing tensors"""
+        """Convert dataframes to tensors and add to existing tensors"""
         try:
             # Conver to tensors
             home_tensor = tf.convert_to_tensor(home_df.values, dtype=tf.float32)
             away_tensor = tf.convert_to_tensor(away_df.values, dtype=tf.float32)
-            target_tensor = tf.convert_to_tensor([target], dtype=tf.int32)
-            # Add batch dimension and concatenate
+            if target is None:
+                target_tensor = tf.convert_to_tensor([], dtype=tf.int32)
+            else:
+                target_tensor = tf.convert_to_tensor([target], dtype=tf.int32)
+            # Add batch dimension
             home_tensor = tf.expand_dims(home_tensor, axis=0)
             away_tensor = tf.expand_dims(away_tensor, axis=0)
 
@@ -146,20 +150,27 @@ class Preprocessor:
         return home_tensor, away_tensor, target_tensor
 
     def _save_match_metadata_in_db(
-        self, season_link, date, home_team, away_team, score, target_value, report_link
+        self,
+        season_link: str,
+        date: str,
+        home_team: str,
+        away_team: str,
+        score: str,
+        target_value,
+        report_link: str,
     ):
         self.db.execute_query(
             f"""
-                        INSERT INTO {PREDICT_METADATA_TABLE} 
-                            (season_link, date, home, away, score, winner, type, report_link)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(season_link, home, away) 
-                        DO UPDATE SET
-                            score = excluded.score,
-                            winner = excluded.winner,
-                            type = excluded.type,
-                            last_updated = CURRENT_TIMESTAMP
-                        """,
+            INSERT INTO {PREDICT_METADATA_TABLE} 
+                (season_link, date, home, away, score, winner, type, report_link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(season_link, home, away) 
+            DO UPDATE SET
+                score = excluded.score,
+                winner = excluded.winner,
+                type = excluded.type,
+                last_updated = CURRENT_TIMESTAMP
+            """,
             params=(
                 season_link,
                 date,
@@ -176,7 +187,8 @@ class Preprocessor:
         self, season_link, home_team, away_team, home_tensor, away_tensor, target_tensor
     ):
         match = self.db.execute_query(
-            f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE season_link = '{season_link}' AND home = '{home_team}' AND away = '{away_team}'",
+            f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE season_link = ? AND home = ? AND away = ?",
+            params=(season_link, home_team, away_team),
         )
         match_uuid = match[0][0]
         # Create directory if it doesn't exist
@@ -184,93 +196,111 @@ class Preprocessor:
         path.mkdir(parents=True, exist_ok=True)
         # Save tensors using tf.io.write_file or convert to numpy and save
         tf.io.write_file(
-            str(path / "home_tensor.ten"), tf.io.serialize_tensor(self.home_tensor)
+            str(path / "home_tensor.ten"), tf.io.serialize_tensor(home_tensor)
         )
         tf.io.write_file(
-            str(path / "away_tensor.ten"), tf.io.serialize_tensor(self.away_tensor)
+            str(path / "away_tensor.ten"), tf.io.serialize_tensor(away_tensor)
         )
         tf.io.write_file(
             str(path / "target_tensor.ten"),
-            tf.io.serialize_tensor(self.target_tensor),
+            tf.io.serialize_tensor(target_tensor),
         )
 
     def preprocess(self):
         """Preprocess data and save processed tensors"""
-        self.data = self.read_data()
-        self._get_feature_cols()
+        try:
+            self.data = self.read_data()
+            self._get_feature_cols()
 
-        logger.info(f"Preprocessing {self.df.shape[0]} matches...")
-        for i, row in self.df.iterrows():
-            # get useful information from row
-            temp_date = row["date"]
-            home_team = row["home"]
-            away_team = row["away"]
-            home_score = row["home_score"]
-            away_score = row["away_score"]
-            season_link = row["season_link"]
-            report_link = row["report_link"]
-            current_match = f"{season_link}-{home_team}-{away_team}"
-            score = (
-                f"{home_score}-{away_score}"
-                if home_score is not None and away_score is not None
-                else None
-            )
-            # filters home and away last n matches
-            home_last_n = self._filter_last_n_matches(home_team, temp_date)
-            away_last_n = self._filter_last_n_matches(away_team, temp_date)
-
-            # only create row if both home and away last n matches are available
-            if home_last_n.shape[0] == self.n and away_last_n.shape[0] == self.n:
-                target_value = self._get_target_value(home_score, away_score)
-
-                # create temp dataframes
-                home_temp_df = pd.DataFrame(
-                    columns=self.feature_cols, index=range(self.n)
+            logger.info(f"Preprocessing {self.df.shape[0]} matches...")
+            for i, row in self.df.iterrows():
+                # get useful information from row
+                temp_date = row["date"]
+                home_team = row["home"]
+                away_team = row["away"]
+                home_score = row["home_score"]
+                away_score = row["away_score"]
+                season_link = row["season_link"]
+                report_link = row["report_link"]
+                current_match = (
+                    f"{season_link} - {temp_date} - {home_team} - {away_team}"
                 )
-                away_temp_df = pd.DataFrame(
-                    columns=self.feature_cols, index=range(self.n)
+                score = (
+                    f"{home_score}-{away_score}"
+                    if pd.notna(home_score) and pd.notna(away_score)
+                    else None
                 )
+                # continue if match has already been processed
+                processed_match = self.db.execute_query(
+                    f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE season_link = ? AND home = ? AND away = ?",
+                    params=(season_link, home_team, away_team),
+                )
+                if processed_match:
+                    continue
 
-                # fill temp dataframes
-                home_temp_df = self._fill_temp_df(home_last_n, home_team, home_temp_df)
-                away_temp_df = self._fill_temp_df(away_last_n, away_team, away_temp_df)
+                # filters home and away last n matches
+                home_last_n = self._filter_last_n_matches(home_team, temp_date)
+                away_last_n = self._filter_last_n_matches(away_team, temp_date)
 
-                # convert to tensor
-                if (
-                    not home_temp_df.isnull().values.any()
-                    and not away_temp_df.isnull().values.any()
-                ):
-                    self.home_tensor, self.away_tensor, self.target_tensor = (
-                        self._process_tensors(home_temp_df, away_temp_df, target_value)
+                # only create row if both home and away last n matches are available
+                if home_last_n.shape[0] == self.n and away_last_n.shape[0] == self.n:
+                    target_value = self._get_target_value(home_score, away_score)
+
+                    # create temp dataframes
+                    home_temp_df = pd.DataFrame(
+                        columns=self.feature_cols, index=range(self.n)
                     )
-                    # TODO: save current match info in PREDICT_METADATA_TABLE
-                    self._save_match_metadata_in_db(
-                        season_link,
-                        temp_date,
-                        home_team,
-                        away_team,
-                        score,
-                        target_value,
-                        report_link,
+                    away_temp_df = pd.DataFrame(
+                        columns=self.feature_cols, index=range(self.n)
                     )
 
-                    # TODO: save current match tensors in PROCESSED_TENSORS_PATH/{match_uuid}/ directory
-                    self._save_current_match_tensors(
-                        season_link,
-                        home_team,
-                        away_team,
-                        self.home_tensor,
-                        self.away_tensor,
-                        self.target_tensor,
+                    # fill temp dataframes
+                    home_temp_df = self._fill_temp_df(
+                        home_last_n, home_team, home_temp_df
                     )
-                else:
+                    away_temp_df = self._fill_temp_df(
+                        away_last_n, away_team, away_temp_df
+                    )
+
+                    # convert to tensor
+                    if (
+                        not home_temp_df.isnull().values.any()
+                        and not away_temp_df.isnull().values.any()
+                    ):
+                        home_tensor, away_tensor, target_tensor = self._process_tensors(
+                            home_temp_df, away_temp_df, target_value
+                        )
+
+                        self._save_match_metadata_in_db(
+                            season_link,
+                            temp_date,
+                            home_team,
+                            away_team,
+                            score,
+                            target_value,
+                            report_link,
+                        )
+
+                        self._save_current_match_tensors(
+                            season_link,
+                            home_team,
+                            away_team,
+                            home_tensor,
+                            away_tensor,
+                            target_tensor,
+                        )
+                    else:
+                        logger.info(
+                            f"At least one of {self.n} previous matches used to build tensor for match {current_match} is missing data. Skipping..."
+                        )
+                if i % 100 == 0:
                     logger.info(
-                        f"At least one of {self.n} previous matches used to build tensor for match {current_match} is missing data. Skipping..."
+                        f"Processed {i}/{self.df.shape[0]} matches - {i/self.df.shape[0]:.0%}."
                     )
-            if i % 100 == 0:
-                logger.info(f"Processed {i}/{self.df.shape[0]} matches.")
-                if i == 400:
-                    break
+        except Exception as e:
+            logger.error(
+                f"Error preprocessing {current_match}: {e}\n{traceback.format_exc()}"
+            )
 
 
 if __name__ == "__main__":

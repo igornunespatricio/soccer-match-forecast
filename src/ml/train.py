@@ -345,7 +345,6 @@ class MLTrainer:
         plt.close()
         logger.info(f"Comprehensive metrics overview saved to {comprehensive_path}")
 
-        # TODO: change the scale for the learning rate chart or remove completely
         # Create separate learning rate chart if available
         lr_metrics = [
             m
