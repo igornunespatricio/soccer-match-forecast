@@ -22,6 +22,7 @@ class MLTrainer:
 
     def load_data(self):
         """Load tensors from processed_tensors directory"""
+        # TODO: add parameter to load model based on dates
         try:
             match_uuid_df = self.db.get_dataframe(
                 f"SELECT match_uuid FROM {PREDICT_METADATA_TABLE} WHERE type = 'training'"
