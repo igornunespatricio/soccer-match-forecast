@@ -91,6 +91,7 @@ class MLTrainer:
 
     def train_model(self, epochs: int = 30, batch_size: int = 32):
         """Train model"""
+        # TODO: add boolean argument to train saved or new model
         # Create model
         self.model = HybridTransformerModel(
             sequence_length=self.home_tensor.shape[1],
@@ -377,10 +378,10 @@ class MLTrainer:
             plt.close()
             logger.info(f"Learning rate chart saved to {lr_path}")
 
-    def training_pipeline(self):
+    def training_pipeline(self, epochs: int = 30, batch_size: int = 32):
         self.load_data()
         self.train_test_split()
-        self.train_model(epochs=5, batch_size=64)
+        self.train_model(epochs, batch_size)
         self.save_model()
         self.save_metrics()
 

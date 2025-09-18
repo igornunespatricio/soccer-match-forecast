@@ -46,6 +46,7 @@ class MatchPredictor:
         WHERE home_win_pred_prob IS NULL 
            OR draw_pred_prob IS NULL 
            OR away_win_pred_prob IS NULL
+           OR type='prediction'
         ORDER BY date
         """
         return self.db.get_dataframe(query)
