@@ -30,17 +30,18 @@ echo -e "${BLUE}Generating markdown structure for: $PROJECT_NAME${NC}"
     echo ""
     echo "\`\`\`"
     
-    # Generate tree structure (exclude common cache/files)
-    tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst
-    
+    # Generate tree structure and filter with awk to exclude processed_tensors
+    tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea|processed_tensors' --dirsfirst 
+
     # Close code block
     echo "\`\`\`"
     echo ""
     
-    # Add timestamp
+    # Add timestamp and note about processed_tensors
     echo "***"
     echo "*Generated on: $(date)*"
-    echo "*Using: \`tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst\`*"
+    echo "*Using: \`tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst | awk filtering\`*"
+    echo "*Note: data/processed_tensors directory excluded (contains many UUID folders with tensor files)*"
     
 } > "$OUTPUT_FILE"
 

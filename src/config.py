@@ -4,8 +4,15 @@ from pathlib import Path
 # Path definitons
 # ==========================================================================
 DATABASE_PATH = Path(__file__).parent.parent / "data"
-SCRAPER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "scraper.log"
-TRANSFORMER_LOGGER_PATH = Path(__file__).parent.parent / "logs" / "transformer.log"
+PROCESSED_TENSORS_PATH = DATABASE_PATH / "processed_tensors"
+MODEL_ARTIFACTS_PATH = Path(__file__).parent.parent / "model_artifacts"
+# Logger paths
+LOGS_PATH = Path(__file__).parent.parent / "logs"
+DEFAULT_LOGGER_PATH = LOGS_PATH / "default.log"
+SCRAPER_LOGGER_PATH = LOGS_PATH / "scraper.log"
+TRANSFORMER_LOGGER_PATH = LOGS_PATH / "transformer.log"
+DATABASE_LOGGER_PATH = LOGS_PATH / "database.log"
+ML_LOGGER_PATH = LOGS_PATH / "ml.log"
 # ==========================================================================
 # Web Scraper Configuration
 # ==========================================================================
@@ -69,6 +76,7 @@ DATABASE_CONFIG = {
 }
 RAW_TABLE = "raw_matches"
 TRANSFORMED_TABLE = "transformed_matches"
+PREDICT_METADATA_TABLE = "predict_metadata"
 
 TRANSFORMED_COLUMNS = [
     "season_link",
@@ -220,3 +228,33 @@ TRANSFOMED_TABLE_QUERY = f"""
                     PRIMARY KEY (report_link)
                 )
                 """
+
+PREDICT_METADATA_TABLE_QUERY = f"""
+                CREATE TABLE IF NOT EXISTS {PREDICT_METADATA_TABLE} (
+                    -- Unique identifier for tensor storage
+                    match_uuid TEXT NOT NULL UNIQUE DEFAULT (LOWER(HEX(RANDOMBLOB(16)))),
+                    
+                    -- Match data
+                    season_link TEXT NOT NULL,
+                    date DATE NOT NULL,
+                    home TEXT NOT NULL,
+                    away TEXT NOT NULL,
+                    score TEXT,
+                    winner TEXT,
+                    type TEXT,
+                    home_win_pred_prob REAL,
+                    draw_pred_prob REAL,
+                    away_win_pred_prob REAL,
+                    report_link TEXT,
+
+                    -- Metadata
+                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                    PRIMARY KEY (season_link, home, away)  -- Composite primary key
+                )
+"""
+
+# ==========================================================================
+# ML Configuration
+# ==========================================================================

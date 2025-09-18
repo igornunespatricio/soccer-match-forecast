@@ -1,4 +1,7 @@
 from src.data.database import DatabaseManager
+from src.ml.predict import MatchPredictor
+from src.ml.preprocess import Preprocessor
+from src.ml.train import MLTrainer
 from src.scraper.scraper import SerieAScraper
 
 from src.config import URLS
@@ -10,6 +13,9 @@ def main(
     scrape_basic_match_data: bool = True,
     scrape_match_reports: bool = True,
     transform_data: bool = True,
+    preprocess_for_ml: bool = True,
+    train_model: bool = True,
+    predict_all_matches: bool = True,
 ):
     # Initialize database
     db = DatabaseManager()
@@ -37,6 +43,25 @@ def main(
         transformer = DataTransformer()
         transformer.transform()
 
+    if preprocess_for_ml:
+        preprocessor = Preprocessor()
+        preprocessor.preprocess()
+
+    if train_model:
+        trainer = MLTrainer()
+        trainer.training_pipeline()
+
+    if predict_all_matches:
+        predictor = MatchPredictor()
+        predictor.predict_all_matches()
+
 
 if __name__ == "__main__":
-    main(scrape_basic_match_data=True, scrape_match_reports=True, transform_data=True)
+    main(
+        scrape_basic_match_data=False,
+        scrape_match_reports=False,
+        transform_data=False,
+        preprocess_for_ml=False,
+        train_model=True,
+        predict_all_matches=True,
+    )
