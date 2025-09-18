@@ -11,7 +11,9 @@
 │   └── test.py
 ├── logs
 │   ├── database.log
-│   └── ml.log
+│   ├── ml.log
+│   ├── scraper.log
+│   └── transformer.log
 ├── model_artifacts
 │   ├── charts
 │   │   ├── accuracy_chart.png
@@ -60,10 +62,10 @@
 ├── poetry.lock
 └── pyproject.toml
 
-13 directories, 45 files
+13 directories, 47 files
 ```
 
 ***
-*Generated on: Tue Sep 16 23:30:52 -03 2025*
+*Generated on: Thu Sep 18 19:32:50 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst | awk filtering`*
 *Note: data/processed_tensors directory excluded (contains many UUID folders with tensor files)*
