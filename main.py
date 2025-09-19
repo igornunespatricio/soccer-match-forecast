@@ -10,12 +10,12 @@ from src.transform import DataTransformer
 
 
 def main(
-    scrape_basic_match_data: bool = True,
-    scrape_match_reports: bool = True,
-    transform_data: bool = True,
-    preprocess_for_ml: bool = True,
-    train_model: bool = True,
-    predict_all_matches: bool = True,
+    scrape_basic_match_data: bool = False,
+    scrape_match_reports: bool = False,
+    transform_data: bool = False,
+    preprocess_for_ml: bool = False,
+    train_model: bool = False,
+    predict_all_matches: bool = False,
 ):
     # Initialize database
     db = DatabaseManager()
@@ -62,6 +62,6 @@ if __name__ == "__main__":
         scrape_match_reports=False,
         transform_data=False,
         preprocess_for_ml=False,
-        train_model=True,
-        predict_all_matches=True,
+        train_model=False,
+        predict_all_matches=False,
     )

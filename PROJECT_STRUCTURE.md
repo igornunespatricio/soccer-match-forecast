@@ -36,6 +36,13 @@
 │   ├── getStructure.ps1
 │   └── install_chrome.sh
 ├── src
+│   ├── app
+│   │   ├── pages
+│   │   │   ├── 1_Upcoming_Matches.py
+│   │   │   ├── 2_Prediction_History.py
+│   │   │   └── __init__.py
+│   │   ├── Home.py
+│   │   └── __init__.py
 │   ├── data
 │   │   ├── __init__.py
 │   │   ├── database.py
@@ -62,10 +69,10 @@
 ├── poetry.lock
 └── pyproject.toml
 
-13 directories, 47 files
+15 directories, 52 files
 ```
 
 ***
-*Generated on: Thu Sep 18 19:32:50 -03 2025*
+*Generated on: Thu Sep 18 21:55:43 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst | awk filtering`*
 *Note: data/processed_tensors directory excluded (contains many UUID folders with tensor files)*
