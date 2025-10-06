@@ -1,12 +1,4 @@
-import os
-import pathlib
-import sys
 import streamlit as st
-
-import streamlit as st
-import os
-import sys
-
 from src.config import PREDICT_METADATA_TABLE
 from src.data.database import DatabaseManager
 
