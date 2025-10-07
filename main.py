@@ -58,10 +58,10 @@ def main(
 
 if __name__ == "__main__":
     main(
-        scrape_basic_match_data=False,
-        scrape_match_reports=False,
-        transform_data=False,
-        preprocess_for_ml=False,
-        train_model=False,
-        predict_all_matches=False,
+        scrape_basic_match_data=True,
+        scrape_match_reports=True,
+        transform_data=True,
+        preprocess_for_ml=True,
+        train_model=True,
+        predict_all_matches=True,
     )
