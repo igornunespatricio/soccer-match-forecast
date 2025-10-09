@@ -99,10 +99,14 @@ This project automates the entire process of soccer match prediction:
 ## 🎮 Usage
 
 1. **Run the full pipeline**:
+   ```bash
    python main.py
+   ```
 
 2. **Launch the dashboard**:
+   ```bash
    streamlit run src/app/Home.py
+   ```
 
 3. **Explore the web app**:
    - **Home**: Project overview
@@ -130,6 +134,6 @@ The system provides:
 ---
 
 ***
-*Generated on: Thu Oct  9 13:04:19 -03 2025*
+*Generated on: Thu Oct  9 13:13:01 -03 2025*
 
 *Note: data/processed_tensors directory excluded from project structure(contains many UUID folders with tensor files)*
