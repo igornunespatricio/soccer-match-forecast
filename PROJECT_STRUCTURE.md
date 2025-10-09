@@ -7,6 +7,7 @@
 ├── ignore
 │   ├── model_architecture.png
 │   ├── nn_transformer.py
+│   ├── notes.txt
 │   ├── system_dependencies_notes.txt
 │   └── test.py
 ├── logs
@@ -32,6 +33,7 @@
 │   ├── eda_nn_specialized_model.ipynb
 │   └── eda_nn_transformer.ipynb
 ├── scripts
+│   ├── create_readme.sh
 │   ├── generate_markdown_tree.sh
 │   ├── getStructure.ps1
 │   └── install_chrome.sh
@@ -40,6 +42,7 @@
 │   │   ├── pages
 │   │   │   ├── 1_Upcoming_Matches.py
 │   │   │   ├── 2_Prediction_History.py
+│   │   │   ├── 3_Model_Metrics.py
 │   │   │   └── __init__.py
 │   │   ├── Home.py
 │   │   └── __init__.py
@@ -69,10 +72,10 @@
 ├── poetry.lock
 └── pyproject.toml
 
-15 directories, 52 files
+15 directories, 55 files
 ```
 
 ***
-*Generated on: Thu Sep 18 21:55:43 -03 2025*
+*Generated on: Thu Oct  9 09:19:08 -03 2025*
 *Using: `tree -a -I '__pycache__|*.pyc|*.db-*|.git|.venv|.vscode|.idea' --dirsfirst | awk filtering`*
 *Note: data/processed_tensors directory excluded (contains many UUID folders with tensor files)*
