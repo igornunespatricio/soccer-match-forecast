@@ -7,6 +7,7 @@ import time
 
 import pandas as pd
 from src.config import (
+    DATABASE_PATH,
     DATABASE_CONFIG,
     PREDICT_METADATA_TABLE,
     PREDICT_METADATA_TABLE_QUERY,
@@ -39,6 +40,16 @@ class DatabaseManager:
         try:
             yield conn
         finally:
+            conn.close()
+
+    def create_database(self):
+        import os
+
+        os.makedirs(DATABASE_PATH, exist_ok=True)
+        if self.config["engine"] == "sqlite":
+            conn = sqlite3.connect(self.config["sqlite_path"])
+            conn.row_factory = sqlite3.Row  # Enable column access by name
+            conn.execute("PRAGMA journal_mode = WAL")  # Better concurrency
             conn.close()
 
     def initialize_raw_table(self):
@@ -78,6 +89,7 @@ class DatabaseManager:
 
     def initialize_db(self):
         """initialize_db creates the necessary tables and indexes for the database."""
+        self.create_database()
         self.initialize_raw_table()
         self.initialize_transformed_table()
         self.initialize_predict_metadata_table()
